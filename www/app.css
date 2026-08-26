@@ -1,0 +1,8 @@
+/* ============================================================
+   app.css
+   App-specifik styling för branscher.
+   Laddas EFTER regiondalarna_ruf.css så att lokala regler
+   kan överstyra den delade identiteten vid behov.
+   ============================================================ */
+
+/* Lägg appspecifika regler här. */

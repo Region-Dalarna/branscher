@@ -1,0 +1,424 @@
+/* ============================================================
+   regiondalarna.css
+   Stilmall för Shiny-appar från Samhällsanalys, Region Dalarna
+   Bygger på:
+   - Region Dalarnas grafiska manual v1.1 (blå färgvektor)
+   - Identiteten i webbrapporterna (styles_hero.css)
+   Version 1.0
+   ============================================================ */
+
+/* ---- 0. SELF-HOSTAT TYPSNITT (Poppins) ---- */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('fonts/poppins-v24-latin-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/poppins-v24-latin-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/poppins-v24-latin-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/poppins-v24-latin-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/poppins-v24-latin-700.woff2') format('woff2');
+}
+
+/* ---- 1. DESIGNTOKENS (CSS-variabler) ---- */
+:root {
+  /* Petrolblå huvudidentitet (matchar webbrapporterna) */
+  --rd-primary:        #158daf;
+  --rd-primary-dark:   #0f7090;
+  --rd-accent:         #54a1bd;
+  --rd-accent-soft:    rgba(84, 161, 189, 0.15);
+
+  /* Blå komplementvektor från grafiska manualen */
+  --rd-blue-bright:    #00b4e4;   /* huvudfärg blå */
+  --rd-blue-light:     #8edded;   /* ljus blå */
+  --rd-blue-pale:      #b6f0fd;   /* ljusast blå */
+  --rd-blue-deep:      #0074a2;   /* mörk blå */
+
+  /* Info/notis-bakgrund (matchar <details> i rapporterna) */
+  --rd-info-bg:        #cff4fc;
+
+  /* Statusfärger – röd används ENDAST som varning/status */
+  --rd-red:            #db3747;
+  --rd-green:          #1a7f4e;
+
+  /* Neutralpalett – grå komplement från grafiska manualen */
+  --rd-text:           #212529;   /* huvudtext */
+  --rd-text-muted:     #6c757d;   /* sekundärtext */
+  --rd-gray-dark:      #424242;   /* manual 66,66,66 */
+  --rd-gray:           #969696;   /* manual 150,150,150 */
+  --rd-gray-light:     #e6e6e6;   /* manual 230,230,230 */
+  --rd-gray-bg:        #f1f1f1;   /* manual 241,241,241 */
+  --rd-border:         #e3e8ed;
+  --rd-bg:             #f7f9fa;
+
+  /* Typografi – Poppins som primär (samma som rapporterna),
+     Arial som webbsäker fallback (manualens kontorstypsnitt) */
+  --rd-font-sans:      'Poppins', Arial, Helvetica, sans-serif;
+  --rd-font-serif:     'Source Serif Pro', 'Sabon LT', Georgia, serif;
+
+  /* Typografisk skala (matchar manualens rubrikhierarki) */
+  --rd-fs-h1:          1.75rem;
+  --rd-fs-h2:          1.35rem;
+  --rd-fs-h3:          1.15rem;
+  --rd-fs-body:        1rem;
+  --rd-fs-small:       0.88rem;
+  --rd-fs-micro:       0.75rem;
+
+  /* Spacing och radier */
+  --rd-radius:         6px;
+  --rd-radius-sm:      4px;
+  --rd-shadow:         0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ---- 2. BAS ---- */
+* { box-sizing: border-box; }
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--rd-font-sans);
+  color: var(--rd-text);
+  background: var(--rd-bg);
+  line-height: 1.5;
+  /* Diskret topp-accent enligt rapportidentiteten */
+  border-top: 4px solid var(--rd-primary);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--rd-font-sans);
+  font-weight: 600;
+  color: var(--rd-text);
+  margin: 0 0 0.5em 0;
+}
+h1 { font-size: var(--rd-fs-h1); }
+h2 { font-size: var(--rd-fs-h2); }
+h3 { font-size: var(--rd-fs-h3); }
+
+a { color: var(--rd-primary); text-decoration: none; }
+a:hover { color: var(--rd-primary-dark); text-decoration: underline; }
+
+/* ---- 3. HEADER ---- */
+.rd-header {
+  background: var(--rd-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 24px;
+  min-height: 56px;
+}
+.rd-header__title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-align: left;
+  flex: 1;
+  padding-right: 20px;
+  line-height: 1.2;
+}
+.rd-header__right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-decoration: none;
+  color: #fff;
+  line-height: 1;
+}
+.rd-header__right img { height: 30px; display: block; }
+.rd-header__right span {
+  font-size: 0.55rem;
+  font-weight: 400;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+/* ---- 4. APP-LAYOUT ---- */
+.rd-app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+}
+.rd-main { display: flex; flex-direction: column; gap: 20px; }
+
+/* ---- 5. SIDOPANEL (filter) ---- */
+.rd-sidebar {
+  background: #fff;
+  border: 1px solid var(--rd-border);
+  border-radius: var(--rd-radius);
+  padding: 20px;
+  height: fit-content;
+  box-shadow: var(--rd-shadow);
+}
+.rd-sidebar h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--rd-text-muted);
+  margin: 0 0 16px 0;
+}
+
+.rd-field { margin-bottom: 18px; }
+.rd-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.rd-select, .rd-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--rd-border);
+  border-radius: var(--rd-radius-sm);
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--rd-text);
+}
+.rd-select:focus, .rd-input:focus {
+  outline: none;
+  border-color: var(--rd-primary);
+  box-shadow: 0 0 0 3px var(--rd-accent-soft);
+}
+
+.rd-radio-group { display: flex; flex-direction: column; gap: 6px; }
+.rd-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--rd-radius-sm);
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.rd-radio:hover { background: var(--rd-accent-soft); }
+.rd-radio input { accent-color: var(--rd-primary); }
+
+/* ---- 6. KNAPPAR ---- */
+.rd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--rd-radius-sm);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.rd-btn--primary { background: var(--rd-primary); color: #fff; }
+.rd-btn--primary:hover { background: var(--rd-primary-dark); }
+.rd-btn--ghost {
+  background: transparent;
+  color: var(--rd-primary);
+  border: 1px solid var(--rd-primary);
+}
+.rd-btn--ghost:hover { background: var(--rd-accent-soft); }
+
+/* ---- 7. FLIKAR ---- */
+.rd-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--rd-border);
+  margin-bottom: -1px;
+}
+.rd-tab {
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--rd-text-muted);
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rd-tab:hover { color: var(--rd-primary); }
+.rd-tab.active {
+  color: var(--rd-primary);
+  border-bottom-color: var(--rd-primary);
+}
+
+/* ---- Luft mellan flikraden och innehållet ---- */
+.tab-content {
+  padding-top: 18px;
+}
+
+/* ---- Shiny tabsetPanel() (Bootstrap .nav-tabs) i regionprofilen ----
+   Shiny's tabsetPanel() renderar Bootstrap-markup (<ul class="nav nav-tabs">).
+   Stilen matchar Brottsappen: vit aktiv flik med rundade hörn, inaktiva
+   flikar i primärfärg med transparent bakgrund.
+   Täcker både BS3 (.nav-tabs > li > a) och BS4+ (.nav-tabs .nav-link). */
+.nav-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--rd-border);
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+.nav-tabs > li {
+  margin-bottom: -1px;
+}
+.nav-tabs > li > a,
+.nav-tabs .nav-link {
+  display: block;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--rd-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.nav-tabs > li > a:hover,
+.nav-tabs > li > a:focus,
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus {
+  background: var(--rd-gray-bg);
+  border-color: transparent;
+  color: var(--rd-primary-dark);
+}
+.nav-tabs > li.active > a,
+.nav-tabs > li.active > a:hover,
+.nav-tabs > li.active > a:focus,
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-link.active:hover,
+.nav-tabs .nav-link.active:focus {
+  background: #fff;
+  color: var(--rd-text);
+  border: 1px solid var(--rd-border);
+  border-bottom-color: #fff;
+}
+
+/* ---- 8. KORT ---- */
+.rd-card {
+  background: #fff;
+  border: 1px solid var(--rd-border);
+  border-radius: var(--rd-radius);
+  padding: 24px;
+  box-shadow: var(--rd-shadow);
+}
+.rd-card h2 {
+  font-size: var(--rd-fs-h3);
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+.rd-card .rd-subtitle {
+  font-size: var(--rd-fs-small);
+  color: var(--rd-text-muted);
+  margin-bottom: 18px;
+}
+
+/* ---- 9. KPI-RUTOR ---- */
+.rd-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.rd-kpi {
+  background: #fff;
+  border: 1px solid var(--rd-border);
+  border-left: 4px solid var(--rd-primary);
+  border-radius: var(--rd-radius);
+  padding: 16px 20px;
+  box-shadow: var(--rd-shadow);
+}
+.rd-kpi__label {
+  font-size: 0.8rem;
+  color: var(--rd-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 500;
+}
+.rd-kpi__value {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-top: 4px;
+  color: var(--rd-text);
+}
+.rd-kpi__delta { font-size: 0.85rem; margin-top: 4px; color: var(--rd-text-muted); }
+.rd-kpi__delta.up   { color: var(--rd-green); }
+.rd-kpi__delta.down { color: var(--rd-red); }
+
+/* ---- 10. INFO-RUTA (motsvarar <details> i rapporterna) ---- */
+.rd-info {
+  background: var(--rd-info-bg);
+  border: 1px dashed #000;
+  border-radius: 3px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+.rd-info strong { font-weight: 600; }
+
+/* ---- 11. TABELL ---- */
+.rd-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.rd-table th {
+  text-align: left;
+  background: var(--rd-bg);
+  padding: 10px 12px;
+  font-weight: 500;
+  border-bottom: 2px solid var(--rd-primary);
+}
+.rd-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rd-border);
+}
+.rd-table tr:hover td { background: var(--rd-accent-soft); }
+
+/* ---- 12. FOOTER ---- */
+.rd-footer {
+  border-top: 1px solid var(--rd-border);
+  padding: 20px 24px;
+  margin-top: 32px;
+  font-size: var(--rd-fs-small);
+  color: var(--rd-text-muted);
+  text-align: center;
+}
+.rd-footer a { color: var(--rd-primary); text-decoration: none; }
+.rd-footer a:hover { text-decoration: underline; }
+
+/* ---- 13. RESPONSIVT ---- */
+@media (max-width: 900px) {
+  .rd-app { grid-template-columns: 1fr; padding: 16px; }
+  .rd-kpi-row { grid-template-columns: 1fr; }
+  .rd-header { padding: 6px 14px; }
+  .rd-header__title { font-size: 1.05rem; }
+  .rd-header__right img { height: 28px; }
+}

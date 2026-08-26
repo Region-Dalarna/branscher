@@ -1,0 +1,70 @@
+name: Deploy Shiny app
+run-name: Deploy ${{ github.event.repository.name }} → ${{ github.ref_name == 'publicera-intern' && 'intern' || 'publik' }}
+
+on:
+  push:
+    branches: [ publicera-publik, publicera-intern ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - ${{ github.ref == 'refs/heads/publicera-intern' && 'shiny-deploy-intern' || 'shiny-deploy-publik' }}
+
+    steps:
+      - name: Fix permissions från tidigare renv-installation
+        shell: bash
+        run: chmod -R u+w "$GITHUB_WORKSPACE" 2>/dev/null || true
+        
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Visa vilken server som deploy:as till
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/publicera-intern" ]; then
+            echo "Deploy till INTERN server (${{ github.event.repository.name }})"
+          else
+            echo "Deploy till PUBLIK server (${{ github.event.repository.name }})"
+          fi
+
+      - name: Deploy app using server-side script
+        run: |
+          TEMP_DIR="${GITHUB_WORKSPACE}"
+          /usr/local/bin/shiny_deploy.sh "${{ github.event.repository.name }}" "$TEMP_DIR"
+
+      - name: Restart Shiny Server if available
+        run: |
+          echo "Kontrollerar om shiny-server-tjänsten finns..."
+
+          if systemctl status shiny-server >/dev/null 2>&1; then
+            echo "shiny-server hittades. Försöker restart..."
+
+            if sudo systemctl restart shiny-server; then
+              echo "Shiny Server restart lyckades."
+            else
+              echo "FEL: Kunde inte köra 'sudo systemctl restart shiny-server'" >&2
+              echo "Försöker hämta senaste loggrader från /var/log/shiny-server.log..."
+
+              if [ -f /var/log/shiny-server.log ]; then
+                echo "====== SISTA 50 RADERNA UR shiny-server.log ======"
+                sudo tail -n 50 /var/log/shiny-server.log || echo "Kunde inte läsa /var/log/shiny-server.log"
+                echo "===================================================="
+              else
+                echo "Ingen loggfil hittades på /var/log/shiny-server.log"
+              fi
+
+              exit 1
+            fi
+          else
+            echo "Ingen systemd-tjänst med namnet 'shiny-server' hittades. Hoppar över restart."
+          fi
+
+      - name: Regenerera landningssida
+        run: |
+          sudo -u shiny /usr/local/bin/generera_landningssida.sh || echo "Varning: kunde inte regenerera landningssidan (ej kritiskt fel)"
+
+      - name: Synka app-lista mot databasen
+        run: |
+          sudo -u shiny /usr/local/bin/synka_app_lista.sh || echo "Varning: kunde inte synka app-listan (ej kritiskt fel)"
+
