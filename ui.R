@@ -1,18 +1,20 @@
-source('global.R')
-
 shinyUI(
   fluidPage(
+    shinyjs::useShinyjs(),
     tags$head(
       tags$link(rel = 'icon', type = 'image/x-icon', href = 'favicon.ico'),
       tags$link(rel = 'stylesheet', type = 'text/css', href = 'regiondalarna_ruf.css'),
       tags$link(rel = 'stylesheet', type = 'text/css', href = 'app.css'),
-      telemetri_ui(telemetry)
+      tags$link(rel = 'stylesheet', type = 'text/css', href = 'tippy.css'),
+      tags$script(src = 'popper.min.js'),
+      tags$script(src = 'tippy-bundle.umd.min.js'),
+      tags$script(src = 'tooltips.js')
     ),
 
-    # ---- Header (matchar .rd-header i regiondalarna_ruf.css) --------------
+    # ---- Header (full bredd via app.css) ---------------------------------
     tags$div(
       class = 'rd-header',
-      tags$div(class = 'rd-header__title', 'branscher'),
+      tags$div(class = 'rd-header__title', 'Branschstatistik Dalarna'),
       tags$a(
         class  = 'rd-header__right',
         href   = 'https://www.regiondalarna.se',
@@ -22,17 +24,36 @@ shinyUI(
       )
     ),
 
-    # ---- Innehåll ---------------------------------------------------------
-    tabsetPanel(
-      id = 'flikval',
-      tabPanel('Tab 1',
-        h3('Hej från branscher'),
-        verbatimTextOutput('example_text')
-      ),
-      tabPanel('Om', p('Beskriv applikationen här.'))
+    # ---- N1: Flikar (yttre tabsetPanel), hela bredden ---------------------
+    div(
+      style = 'padding: 8px 24px 24px;',
+      tabsetPanel(
+        id = 'flik',
+
+        tabPanel('Översikt', mod_oversikt_ui('oversikt')),
+        tabPanel('Sysselsättning & yrken',  mod_flik_placeholder_ui('sysselsattning',  'Sysselsättning & yrken')),
+        tabPanel('Demografi',               mod_flik_placeholder_ui('demografi',       'Demografi')),
+        tabPanel('Utbildning',              mod_flik_placeholder_ui('utbildning',      'Utbildning')),
+        tabPanel('Behov & rekrytering',     mod_flik_placeholder_ui('behov',           'Behov & rekrytering')),
+        tabPanel('Rörlighet & hälsa',       mod_flik_placeholder_ui('rorlighet_halsa', 'Rörlighet & hälsa')),
+        tabPanel('Prognos',                 mod_flik_placeholder_ui('prognos',         'Prognos')),
+
+        tabPanel(
+          'Om rapporten',
+          div(class = 'rd-card',
+              h2('Om rapporten'),
+              p('Den här applikationen visar branschstatistik för Dalarna, ',
+                'utifrån inspel från branschorganisationerna. I nuvarande ',
+                'version är Översikt inlagd; övriga flikar tillkommer efter hand.'),
+              div(class = 'rd-info',
+                  tags$strong('Källa: '),
+                  'SCB (RAMS) m.fl., bearbetat av Region Dalarna.')
+          )
+        )
+      )
     ),
 
-    # ---- Footer (matchar .rd-footer i regiondalarna_ruf.css) --------------
+    # ---- Footer (full bredd via app.css) ----------------------------------
     tags$div(
       class = 'rd-footer',
       'Samhällsanalys, Region Dalarna · ',
