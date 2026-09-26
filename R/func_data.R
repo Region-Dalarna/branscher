@@ -8,8 +8,9 @@
 #     region_ast, region_bo, kon, branschkod, bransch, matt, antal.
 #     Population = sysselsatta med arbetsställe i Dalarnas kommuner,
 #     länet (regionkod_ast == "20") eller riket (regionkod_ast == "00").
-#     regionkod_bo (bosättningskommun) finns på samma rad men används
-#     INTE här -- sparas för en framtida pendlings-/rörlighetsflik.
+#     alder/bakgrund/kon/regionkod_bo används INTE av appen och summeras
+#     bort redan i databasen vid inläsning (se hamta_syss_branscher()).
+#     En framtida pendlingsflik får göra en egen fråga på regionkod_bo.
 #   - nycklar.sni_huvudgrupper -- SNI-branschkoder (2-siffrigt) med fyra
 #     färdiga branschindelningar som egna kolumner (bransch_20, bransch_37,
 #     bransch_52kat, bransch_61kat) samt en grövre gruppering
@@ -93,14 +94,10 @@ rensa_syss_branscher <- function(rad) {
   rad |>
     dplyr::transmute(
       ar           = as.integer(ar),
-      alder        = alder,
-      bakgrund     = bakgrund,
-      kon          = kon,
       matt         = matt,
       branschkod   = sprintf("%02d", as.integer(branschkod)),
       bransch      = bransch,
       kommun_kod   = as.character(regionkod_ast),  # tabellens population är arbetsställebaserad (dagbefolkning)
-      bokommun_kod = as.character(regionkod_bo),    # bosättningskommun -- sparad för framtida pendlingsanalys, oanvänd i Översikt
       antal        = as.numeric(antal)
     )
 }
@@ -108,7 +105,12 @@ rensa_syss_branscher <- function(rad) {
 hamta_syss_branscher <- function(force = FALSE) {
   if (force || is.null(.syss_cache$df)) {
     con <- shiny_uppkoppling_las("oppna_data")
+    # Ålder/kön/bakgrund/bosättningskommun används inte av appen och
+    # summeras bort redan i databasen -- ger en bråkdel av raderna att
+    # hämta jämfört med hela tabellen.
     rad <- dplyr::tbl(con, dbplyr::in_schema("mikro_db", "syss_branscher")) |>
+      dplyr::group_by(ar, matt, regionkod_ast, branschkod, bransch) |>
+      dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
       dplyr::collect()
     DBI::dbDisconnect(con)
     .syss_cache$df <- rensa_syss_branscher(rad)

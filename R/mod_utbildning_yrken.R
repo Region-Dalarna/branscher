@@ -115,15 +115,20 @@ mod_utbildning_yrken_ui <- function(id) {
   )
 }
 
-mod_utbildning_yrken_server <- function(id) {
+# aktiv: reaktiv som är TRUE när fliken visas. Fliken hämtar ingen data
+# förrän den öppnats första gången -- alla datafrågor väntar (req) på
+# valen som fylls i nedan, så appen startar utan att fråga databasen här.
+mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     indelningar <- hamta_indelningar()
     kommuner    <- hamta_kommuner()
-    ar_lista    <- hamta_ar_lista_yrke_utb()
 
-    shiny::observe({
+    forsta_oppning <- shiny::reactive(if (isTRUE(aktiv())) TRUE else NULL)
+
+    shiny::observeEvent(forsta_oppning(), once = TRUE, {
+      ar_lista <- hamta_ar_lista_yrke_utb()
       updateSelectInput(session, 'ar_val', choices = ar_lista, selected = ar_lista[1])
       updateSelectInput(session, 'geografi_val',
                         choices = c('Hela Dalarna (länet)' = '20',
@@ -135,6 +140,7 @@ mod_utbildning_yrken_server <- function(id) {
     })
 
     shiny::observeEvent(input$indelning_val, {
+      shiny::req(input$indelning_val)  # "" vid start, innan valen fyllts
       grp <- hamta_grupper_for_indelning(input$indelning_val)
       updateSelectInput(session, 'bransch_val',
                         choices = c('Alla branscher' = '',
