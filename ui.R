@@ -31,9 +31,8 @@ shinyUI(
         id = 'flik',
 
         tabPanel('Översikt', mod_oversikt_ui('oversikt')),
-        tabPanel('Sysselsättning & yrken',  mod_flik_placeholder_ui('sysselsattning',  'Sysselsättning & yrken')),
+        tabPanel('Utbildning & yrken',      mod_utbildning_yrken_ui('utbildning_yrken')),
         tabPanel('Demografi',               mod_flik_placeholder_ui('demografi',       'Demografi')),
-        tabPanel('Utbildning',              mod_flik_placeholder_ui('utbildning',      'Utbildning')),
         tabPanel('Behov & rekrytering',     mod_flik_placeholder_ui('behov',           'Behov & rekrytering')),
         tabPanel('Rörlighet & hälsa',       mod_flik_placeholder_ui('rorlighet_halsa', 'Rörlighet & hälsa')),
         tabPanel('Prognos',                 mod_flik_placeholder_ui('prognos',         'Prognos')),

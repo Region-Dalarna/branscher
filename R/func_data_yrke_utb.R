@@ -1,0 +1,270 @@
+# ============================================================
+#  func_data_yrke_utb.R
+#  Dataåtkomst för fliken "Utbildning & yrken".
+#
+#  Källa (databasen "oppna_data"): mikro_db.utb_yrken_branscher.
+#  Kolumner: ar, bas (1 = sysselsatt), bas_namn, ssyk3_2012,
+#  ssyk3_2012_namn, sun2020niva(_namn), sun2020grp(_namn),
+#  sun2020grp_t23(_klartext), sun2000grp_t20(_klartext), alder, kon,
+#  bakgrund, match_23, matchningsindikator, gruppering, regionkod_ast,
+#  region_ast, regionkod_bo, region_bo, branschkod, bransch,
+#  syss (= antal).
+#
+#  Till skillnad från syss_branscher läses tabellen INTE in i sin helhet
+#  -- den är för stor. Varje anrop filtrerar (år, regionkod_ast, bransch)
+#  och summerar i databasen, och bara det aggregerade resultatet hämtas.
+#  Rekommenderat index i databasen:
+#    CREATE INDEX ON mikro_db.utb_yrken_branscher (ar, regionkod_ast, branschkod);
+#
+#  Precis som i syss_branscher finns inga "totalt"-rader: riket ("00"),
+#  länet ("20") och kommuner ligger som egna rader, och ålder/kön/
+#  bakgrund/bosättningsregion summeras bort genom att inte grupperas på.
+# ============================================================
+
+YRKE_UTB_TABELL <- c(schema = "mikro_db", tabell = "utb_yrken_branscher")
+
+# Utbildningsindelningar som går att välja i UI:t.
+UTB_INDELNINGAR <- tibble::tribble(
+  ~namn,                                   ~kod_kol,          ~namn_kol,
+  "Utbildningsgrupp (SUN 2020)",           "sun2020grp",      "sun2020grp_namn",
+  "Utbildningsgrupp (SUN 2020, T23)",      "sun2020grp_t23",  "sun2020grp_t23_klartext",
+  "Utbildningsgrupp (SUN 2000, T20)",      "sun2000grp_t20",  "sun2000grp_t20_klartext",
+  "Utbildningsnivå (SUN 2020)",       "sun2020niva",     "sun2020niva_namn"
+)
+
+# Andelar visas bara när nämnaren (t.ex. ett yrkes sysselsatta) är minst
+# så här stor -- skydd mot att små celler kan räknas fram ur andelar.
+MIN_NAMNARE <- 20
+
+.utb_namn_kol <- function(kod_kol) {
+  UTB_INDELNINGAR$namn_kol[UTB_INDELNINGAR$kod_kol == kod_kol]
+}
+
+# Matchning ("gruppering"). Andelar matchade räknas bland de tre
+# MATCHNING_GRUPPER; MATCHNING_UTAN visas separat (andel av anställda).
+# Övriga värden ("Ingår inte", "Visas inte") tas inte med.
+MATCHNING_GRUPPER <- c("Helt matchade", "Delvis matchade", "Inte matchade")
+MATCHNING_UTAN    <- "Anst\u00e4llda utan tillr\u00e4ckliga uppgifter"
+
+.yrke_utb_cache <- new.env(parent = emptyenv())
+
+.yrke_utb_tbl <- function(con) {
+  dplyr::tbl(con, dbplyr::in_schema(YRKE_UTB_TABELL[["schema"]],
+                                    YRKE_UTB_TABELL[["tabell"]]))
+}
+
+# Tillgängliga år i tabellen, nyast först. Hämtas en gång per process.
+hamta_ar_lista_yrke_utb <- function(force = FALSE) {
+  if (force || is.null(.yrke_utb_cache$ar)) {
+    con <- shiny_uppkoppling_las("oppna_data")
+    on.exit(DBI::dbDisconnect(con))
+    .yrke_utb_cache$ar <- .yrke_utb_tbl(con) |>
+      dplyr::distinct(ar) |>
+      dplyr::collect() |>
+      dplyr::pull(ar) |>
+      as.integer() |>
+      sort(decreasing = TRUE)
+  }
+  .yrke_utb_cache$ar
+}
+
+# Koder i den typ kolumnen har i databasen (tal eller text), så att
+# filtret jämför kolumnen direkt -- en CAST på kolumnen gör att indexet
+# inte används. Kolumntyperna läses en gång (fråga som ger 0 rader).
+.som_kolumntyp <- function(con, kol, koder) {
+  if (is.null(.yrke_utb_cache$typer)) {
+    .yrke_utb_cache$typer <- .yrke_utb_tbl(con) |>
+      utils::head(0) |>
+      dplyr::collect() |>
+      vapply(function(x) class(x)[1], character(1))
+  }
+  if (.yrke_utb_cache$typer[[kol]] %in% c("integer", "numeric", "integer64")) {
+    as.integer(koder)
+  } else {
+    as.character(koder)
+  }
+}
+
+# Grundfråga: summa sysselsatta grupperat på regionkod_ast + dims, för
+# valt år, valda geografier och (valfritt) valda branschkoder. villkor är
+# en namngiven lista med likhetsfilter, t.ex. list(ssyk3_2012 = "251").
+hamta_yrke_utb <- function(ar_val, geografier, dims, branschkoder = NULL,
+                           villkor = list()) {
+  con <- shiny_uppkoppling_las("oppna_data")
+  on.exit(DBI::dbDisconnect(con))
+
+  q <- .yrke_utb_tbl(con) |>
+    dplyr::filter(
+      ar  == !!as.integer(ar_val),
+      bas == 1L,  # sysselsatta
+      regionkod_ast %in% !!.som_kolumntyp(con, "regionkod_ast", geografier)
+    )
+
+  if (length(branschkoder) > 0) {
+    q <- dplyr::filter(q, branschkod %in% !!.som_kolumntyp(con, "branschkod", branschkoder))
+  }
+  for (kol in names(villkor)) {
+    q <- dplyr::filter(q, !!rlang::sym(kol) == !!villkor[[kol]])
+  }
+
+  q |>
+    dplyr::group_by(regionkod_ast, !!!rlang::syms(dims)) |>
+    dplyr::summarise(antal = sum(syss, na.rm = TRUE), .groups = "drop") |>
+    dplyr::collect() |>
+    dplyr::mutate(
+      kommun_kod = sprintf("%02d", as.integer(regionkod_ast)),
+      antal      = as.numeric(antal)
+    ) |>
+    dplyr::select(-regionkod_ast)
+}
+
+# Branschkoder (SNI 2-siffrigt) som hör till en grupp i en indelning.
+# grupp_namn = "" (Alla branscher) ger NULL, dvs. inget branschfilter.
+hamta_branschkoder <- function(indelning_kolumn, grupp_namn) {
+  if (is.null(grupp_namn) || !nzchar(grupp_namn)) return(NULL)
+  hamta_dim_bransch() |>
+    dplyr::filter(.data[[indelning_kolumn]] == grupp_namn) |>
+    dplyr::pull(branschkod)
+}
+
+# Yrke x utbildning(sgrupp) för vald geografi och riket. Grund för
+# nyckeltal och båda detaljdiagrammen (yrke -> utbildningar och
+# utbildning -> yrken). Returnerar kolumnerna kommun_kod, yrke_kod,
+# yrke_namn, utb_kod, utb_namn, antal.
+hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol) {
+  namn_kol <- .utb_namn_kol(utb_kol)
+  dims <- c("ssyk3_2012", "ssyk3_2012_namn", utb_kol, stats::na.omit(namn_kol))
+
+  df <- hamta_yrke_utb(ar_val, unique(c(geografi, "00")), dims, branschkoder)
+
+  df |>
+    dplyr::transmute(
+      kommun_kod,
+      yrke_kod  = as.character(ssyk3_2012),
+      yrke_namn = ssyk3_2012_namn,
+      utb_kod   = as.character(.data[[utb_kol]]),
+      utb_namn  = if (is.na(namn_kol)) utb_kod else .data[[namn_kol]],
+      antal
+    )
+}
+
+# Yrke x (utbildningsnivå, matchning, ålder, kön) för vald geografi.
+# Ett anrop räcker för alla fördelningsdiagram -- de summeras fram ur
+# detta i R (se fordelning_per_yrke()).
+hamta_yrke_profil <- function(ar_val, geografi, branschkoder) {
+  dims <- c("ssyk3_2012", "ssyk3_2012_namn", "sun2020niva", "sun2020niva_namn",
+            "gruppering", "alder", "kon")
+
+  hamta_yrke_utb(ar_val, geografi, dims, branschkoder) |>
+    dplyr::transmute(
+      yrke_kod     = as.character(ssyk3_2012),
+      yrke_namn    = ssyk3_2012_namn,
+      niva_kod     = as.character(sun2020niva),
+      niva_namn    = sun2020niva_namn,
+      matchning    = gruppering,
+      alder        = alder,
+      kon          = kon,
+      antal
+    )
+}
+
+# ---- Bearbetning (i R, på redan hämtad data) ------------------------------
+
+# De n största yrkena (efter antal sysselsatta) i en profil-df.
+storsta_yrken <- function(profil, n = 20) {
+  profil |>
+    dplyr::group_by(yrke_kod, yrke_namn) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop") |>
+    dplyr::filter(yrke_kod != "***") |>  # "***" = yrke saknas
+    dplyr::slice_max(antal, n = n, with_ties = FALSE)
+}
+
+# Fördelning över en kategorikolumn per yrke, för de n största yrkena.
+# Andelar för yrken med färre än MIN_NAMNARE sysselsatta sätts till NA.
+fordelning_per_yrke <- function(profil, kat_kol, n = 20) {
+  topp <- storsta_yrken(profil, n)
+
+  profil |>
+    dplyr::semi_join(topp, by = "yrke_kod") |>
+    dplyr::group_by(yrke_kod, yrke_namn, kategori = .data[[kat_kol]]) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop") |>
+    dplyr::group_by(yrke_kod) |>
+    dplyr::mutate(
+      total = sum(antal),
+      andel = dplyr::if_else(total >= MIN_NAMNARE, antal / total, NA_real_)
+    ) |>
+    dplyr::ungroup()
+}
+
+# Andel per kategori inom en vald enhet (ett yrke eller en utbildning),
+# för vald geografi och riket. kat = "utb" ger utbildningar inom ett
+# yrke, kat = "yrke" ger yrken inom en utbildning. De topp_n största
+# (i vald geografi) visas, resten samlas i "Övriga".
+andel_inom <- function(yrke_x_utb, geografi, filter_kol, filter_varde,
+                       kat = c("utb", "yrke"), topp_n = 15) {
+  kat <- match.arg(kat)
+  kod_kol  <- paste0(kat, "_kod")
+  namn_kol <- paste0(kat, "_namn")
+
+  d <- yrke_x_utb |>
+    dplyr::filter(.data[[filter_kol]] == filter_varde) |>
+    # Är vald geografi riket blir allt "vald" (ingen separat jämförelse).
+    dplyr::mutate(geo_niva = dplyr::if_else(kommun_kod == geografi, "vald", "riket")) |>
+    dplyr::group_by(geo_niva, kod = .data[[kod_kol]], namn = .data[[namn_kol]]) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop")
+
+  topp <- d |>
+    dplyr::filter(geo_niva == "vald") |>
+    dplyr::slice_max(antal, n = topp_n, with_ties = FALSE) |>
+    dplyr::pull(kod)
+
+  d |>
+    dplyr::mutate(
+      namn = dplyr::if_else(kod %in% topp, namn, "Övriga"),
+      kod  = dplyr::if_else(kod %in% topp, kod, "övr")
+    ) |>
+    dplyr::group_by(geo_niva, kod, namn) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop") |>
+    dplyr::group_by(geo_niva) |>
+    dplyr::mutate(total = sum(antal), andel = antal / total) |>
+    dplyr::ungroup()
+}
+
+# Rekryteringsbredd: antal utbildningsgrupper som krävs för att täcka
+# 80 % av ett yrkes sysselsatta. Returnerar medianen över yrken med minst
+# MIN_NAMNARE sysselsatta (NA om inga sådana finns).
+rekryteringsbredd_median <- function(yrke_x_utb, geografi, tackning = 0.8) {
+  per_yrke <- yrke_x_utb |>
+    dplyr::filter(kommun_kod == geografi, yrke_kod != "***") |>
+    dplyr::group_by(yrke_kod) |>
+    dplyr::filter(sum(antal) >= MIN_NAMNARE) |>
+    dplyr::arrange(dplyr::desc(antal), .by_group = TRUE) |>
+    dplyr::summarise(bredd = which(cumsum(antal) / sum(antal) >= tackning)[1])
+
+  if (nrow(per_yrke) == 0) return(NA_real_)
+  stats::median(per_yrke$bredd)
+}
+
+# Andel anställda utan tillräckliga yrkes-/utbildningsuppgifter per
+# bransch (alla branscher i vald indelning -- inte filtrerat på vald
+# bransch), för vald geografi och riket. Returnerar samma kolumner som
+# andel_inom(), så att skapa_diagram_andel_inom() kan rita den.
+hamta_andel_utan_uppgifter <- function(ar_val, geografi, indelning_kolumn) {
+  dim_br <- hamta_dim_bransch() |>
+    dplyr::select(branschkod, namn = dplyr::all_of(indelning_kolumn)) |>
+    dplyr::filter(!is.na(namn), namn != "")
+
+  hamta_yrke_utb(ar_val, unique(c(geografi, "00")), c("branschkod", "gruppering")) |>
+    dplyr::filter(gruppering %in% c(MATCHNING_GRUPPER, MATCHNING_UTAN)) |>
+    dplyr::mutate(branschkod = sprintf("%02d", as.integer(branschkod))) |>
+    dplyr::inner_join(dim_br, by = "branschkod") |>
+    dplyr::mutate(geo_niva = dplyr::if_else(kommun_kod == geografi, "vald", "riket")) |>
+    dplyr::group_by(geo_niva, kod = namn, namn) |>
+    dplyr::summarise(
+      total = sum(antal),
+      antal = sum(antal[gruppering == MATCHNING_UTAN]),
+      .groups = "drop"
+    ) |>
+    dplyr::filter(total >= MIN_NAMNARE) |>
+    dplyr::mutate(andel = antal / total)
+}

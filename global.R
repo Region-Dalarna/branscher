@@ -26,6 +26,9 @@ source("https://raw.githubusercontent.com/Region-Dalarna/funktioner/main/func_sh
 #   R/def_farger.R              färgprofil (Region Dalarna)
 #   R/def_geografi.R            kommuner i Dalarna (placeholder tills databas kopplas in)
 #   R/func_data.R               databas-/demodataläsning (schema mikro_db, db oppna_data)
+#   R/func_data_yrke_utb.R      dataåtkomst yrke x utbildning (aggregeras i databasen)
 #   R/func_diagram.R            diagramhjälpare (ggiraph)
+#   R/func_diagram_yrke_utb.R   diagram för flik Utbildning & yrken
 #   R/mod_oversikt.R            modul: flik Översikt
+#   R/mod_utbildning_yrken.R    modul: flik Utbildning & yrken
 #   R/mod_flik_placeholder.R    platshållarmodul för flikar som inte är byggda än

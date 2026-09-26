@@ -1,6 +1,7 @@
 shinyServer(function(input, output, session) {
 
-  # Flik Översikt (övriga flikar är platshållare utan server tills vidare).
+  # Övriga flikar är platshållare utan server tills vidare.
   mod_oversikt_server('oversikt')
+  mod_utbildning_yrken_server('utbildning_yrken')
 
 })
