@@ -25,14 +25,20 @@ YRKE_UTB_TABELL <- c(schema = "mikro_db", tabell = "utb_yrken_branscher")
 
 KALLA_YRKE_UTB <- "SCB (Yrkesregistret, Utbildningsregistret), bearbetat av Region Dalarna"
 
-# Utbildningsindelningar som går att välja i UI:t.
+# Utbildningsindelningar som går att välja i UI:t, i den ordning de
+# visas. Den första (T23) är förvald.
 UTB_INDELNINGAR <- tibble::tribble(
   ~namn,                                   ~kod_kol,          ~namn_kol,
-  "Utbildningsgrupp (SUN 2020)",           "sun2020grp",      "sun2020grp_namn",
   "Utbildningsgrupp (SUN 2020, T23)",      "sun2020grp_t23",  "sun2020grp_t23_klartext",
   "Utbildningsgrupp (SUN 2000, T20)",      "sun2000grp_t20",  "sun2000grp_t20_klartext",
+  "Utbildningsgrupp (SUN 2020)",           "sun2020grp",      "sun2020grp_namn",
   "Utbildningsnivå (SUN 2020)",            "sun2020niva",     "sun2020niva_namn"
 )
+
+# Koder/namn som betyder okänt -- väljs inte som förval i listorna.
+.ar_okand <- function(kod, namn) {
+  kod %in% c("***", "saknas") | grepl("saknas|ok\u00e4nd", namn, ignore.case = TRUE)
+}
 
 # Andelar visas bara när nämnaren (t.ex. ett yrkes sysselsatta) är minst
 # så här stor -- skydd mot att små celler kan räknas fram ur andelar.
@@ -166,15 +172,32 @@ hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol) {
 
 # Yrke x valda kategorikolumner (t.ex. gruppering, alder, kon, bakgrund)
 # för vald geografi. Grund för fördelningsdiagrammen per yrke i flikarna
-# Matchning och Demografi. kat_kolumner behåller sina namn i resultatet.
+# Matchning och Demografi. Enheten (yrket) heter enhet_kod/enhet_namn så
+# att samma bearbetning och diagram fungerar för branscher (se nedan).
 hamta_yrke_profil <- function(ar_val, geografi, branschkoder, kat_kolumner) {
   hamta_yrke_utb(ar_val, geografi, c("ssyk3_2012", "ssyk3_2012_namn", kat_kolumner),
                  branschkoder) |>
     dplyr::mutate(
-      yrke_kod  = .kod_eller_saknas(ssyk3_2012),
-      yrke_namn = .namn_eller_kod(ssyk3_2012_namn, yrke_kod)
+      enhet_kod  = .kod_eller_saknas(ssyk3_2012),
+      enhet_namn = .namn_eller_kod(ssyk3_2012_namn, enhet_kod)
     ) |>
-    dplyr::select(yrke_kod, yrke_namn, dplyr::all_of(kat_kolumner), antal)
+    dplyr::select(enhet_kod, enhet_namn, dplyr::all_of(kat_kolumner), antal)
+}
+
+# Bransch (grupp i vald indelning) x valda kategorikolumner för vald
+# geografi -- alla branscher, inte filtrerat på vald bransch. Samma
+# kolumner som hamta_yrke_profil(); enhet_kod = enhet_namn = gruppnamnet.
+hamta_bransch_profil <- function(ar_val, geografi, indelning_kolumn, kat_kolumner) {
+  dim_br <- hamta_dim_bransch() |>
+    dplyr::select(branschkod, grupp = dplyr::all_of(indelning_kolumn)) |>
+    dplyr::filter(!is.na(grupp), grupp != "")
+
+  hamta_yrke_utb(ar_val, geografi, c("branschkod", kat_kolumner)) |>
+    dplyr::mutate(branschkod = sprintf("%02d", as.integer(branschkod))) |>
+    dplyr::inner_join(dim_br, by = "branschkod") |>
+    dplyr::group_by(enhet_kod = grupp, enhet_namn = grupp,
+                    dplyr::across(dplyr::all_of(kat_kolumner))) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop")
 }
 
 # Andel av totalen i en profil-df där kat_kol har något av värdena.
@@ -188,25 +211,26 @@ andel_av_total <- function(profil, kat_kol, varden, bland = NULL) {
 
 # ---- Bearbetning (i R, på redan hämtad data) ------------------------------
 
-# De n största yrkena (efter antal sysselsatta) i en profil-df.
-storsta_yrken <- function(profil, n = 20) {
+# De n största enheterna (yrken/branscher) efter antal sysselsatta.
+# Okänt yrke ("***"/"saknas") tas inte med.
+storsta_enheter <- function(profil, n = 20) {
   profil |>
-    dplyr::group_by(yrke_kod, yrke_namn) |>
+    dplyr::group_by(enhet_kod, enhet_namn) |>
     dplyr::summarise(antal = sum(antal), .groups = "drop") |>
-    dplyr::filter(!yrke_kod %in% c("***", "saknas")) |>  # "***" = yrke saknas
+    dplyr::filter(!enhet_kod %in% c("***", "saknas")) |>
     dplyr::slice_max(antal, n = n, with_ties = FALSE)
 }
 
-# Fördelning över en kategorikolumn per yrke, för de n största yrkena.
-# Andelar för yrken med färre än MIN_NAMNARE sysselsatta sätts till NA.
-fordelning_per_yrke <- function(profil, kat_kol, n = 20) {
-  topp <- storsta_yrken(profil, n)
+# Fördelning över en kategorikolumn per enhet, för de n största.
+# Andelar för enheter med färre än MIN_NAMNARE sysselsatta sätts till NA.
+fordelning_per_enhet <- function(profil, kat_kol, n = 20) {
+  topp <- storsta_enheter(profil, n)
 
   profil |>
-    dplyr::semi_join(topp, by = "yrke_kod") |>
-    dplyr::group_by(yrke_kod, yrke_namn, kategori = .data[[kat_kol]]) |>
+    dplyr::semi_join(topp, by = "enhet_kod") |>
+    dplyr::group_by(enhet_kod, enhet_namn, kategori = .data[[kat_kol]]) |>
     dplyr::summarise(antal = sum(antal), .groups = "drop") |>
-    dplyr::group_by(yrke_kod) |>
+    dplyr::group_by(enhet_kod) |>
     dplyr::mutate(
       total = sum(antal),
       andel = dplyr::if_else(total >= MIN_NAMNARE, antal / total, NA_real_)

@@ -34,49 +34,51 @@ RD_KATEGORISK_2 <- c("#2a78d6", "#eb6834")
          format(antal, big.mark = " ", scientific = FALSE, trim = TRUE))
 }
 
-# ---- 100 %-staplar: fördelning per yrke -----------------------------------
-# df från fordelning_per_yrke(). kat_ordning = kategoriernas ordning,
-# farger = namngiven vektor (kategori -> färg). sortera_kategori: sortera
-# yrkena efter andelen i denna kategori (t.ex. "60-67 år"); NULL sorterar
-# efter yrkets storlek. Varje yrke är klickbart (data_id = yrke_kod).
-skapa_diagram_fordelning_per_yrke <- function(df, kat_ordning, farger,
-                                              markerat_yrke = NULL,
-                                              sortera_kategori = NULL,
-                                              rubrik = NULL, underrubrik = NULL,
-                                              kalla = NULL) {
+# ---- 100 %-staplar: fördelning per yrke eller bransch --------------------
+# df från fordelning_per_enhet() (en rad per enhet = yrke/bransch och
+# kategori). kat_ordning = kategoriernas ordning, farger = namngiven
+# vektor (kategori -> färg). sortera_kategori: sortera enheterna efter
+# andelen i denna kategori (t.ex. "60-67 år"); NULL sorterar efter
+# storlek. markerad = enhet_kod som framhävs (övriga tonas ned).
+skapa_diagram_fordelning <- function(df, kat_ordning, farger,
+                                     markerad = NULL,
+                                     sortera_kategori = NULL,
+                                     rubrik = NULL, underrubrik = NULL,
+                                     kalla = NULL) {
   d <- dplyr::filter(df, !is.na(andel))
   if (nrow(d) == 0) {
     return(.girafe_std(.tom_plot("För få sysselsatta i urvalet för att visa fördelning")))
   }
 
   ordning <- if (is.null(sortera_kategori)) {
-    d |> dplyr::distinct(yrke_namn, total) |> dplyr::arrange(total)
+    d |> dplyr::distinct(enhet_namn, total) |> dplyr::arrange(total)
   } else {
     d |>
-      dplyr::group_by(yrke_namn) |>
+      dplyr::group_by(enhet_namn) |>
       dplyr::summarise(s = sum(andel[kategori == sortera_kategori])) |>
       dplyr::arrange(s)
   }
 
-  markerat <- !is.null(markerat_yrke) && nzchar(markerat_yrke)
+  markerat <- !is.null(markerad) && nzchar(markerad)
   d <- d |>
     dplyr::mutate(
-      yrke_namn = factor(yrke_namn, levels = ordning$yrke_namn),
+      enhet_namn = factor(enhet_namn, levels = ordning$enhet_namn),
       kategori  = factor(kategori, levels = rev(kat_ordning)),
-      alfa      = if (markerat) dplyr::if_else(yrke_kod == markerat_yrke, 1, 0.45) else 1,
+      alfa      = if (markerat) dplyr::if_else(enhet_kod == markerad, 1, 0.45) else 1,
       etikett   = dplyr::if_else(andel >= 0.1, scales::percent(andel, accuracy = 1), ""),
-      etikettfarg = .etikettfarg(farger[as.character(kategori)])
+      # Nedtonade rader: mörk text (vit text blir oläslig på blek fyllning).
+      etikettfarg = dplyr::if_else(alfa < 1, RD_TEXT, .etikettfarg(farger[as.character(kategori)]))
     )
 
-  g <- ggplot2::ggplot(d, ggplot2::aes(x = andel, y = yrke_namn, fill = kategori, group = kategori)) +
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = andel, y = enhet_namn, fill = kategori, group = kategori)) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(
         alpha   = alfa,
-        tooltip = paste0("<b>", yrke_namn, "</b><br/>", kategori, ": ",
+        tooltip = paste0("<b>", enhet_namn, "</b><br/>", kategori, ": ",
                          scales::percent(andel, accuracy = 0.1),
                          " (", .antal_txt(antal), " av ",
                          format(total, big.mark = " ", trim = TRUE), ")"),
-        data_id = yrke_kod
+        data_id = enhet_kod
       ),
       width = 0.72, color = "white", linewidth = 0.4
     ) +
@@ -101,7 +103,7 @@ skapa_diagram_fordelning_per_yrke <- function(df, kat_ordning, farger,
 
   .girafe_std(g,
               width_svg  = 10,
-              height_svg = max(4, dplyr::n_distinct(d$yrke_namn) * 0.38 + 2),
+              height_svg = max(4, dplyr::n_distinct(d$enhet_namn) * 0.38 + 2),
               selection  = TRUE)
 }
 

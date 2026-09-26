@@ -38,15 +38,14 @@ mod_oversikt_ui <- function(id) {
       div(class = 'rd-main',
 
           div(class = 'rd-kpi-row',
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Sysselsatta'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_sysselsatta')))),
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Etablerade'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_etablerade')))),
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Andel av rikets syssels\u00e4ttning'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_andel'))))
+              rd_kpi('Sysselsatta', textOutput(ns('box_sysselsatta')),
+                     paste('Antal sysselsatta med arbetsst\u00e4lle i vald geografi',
+                           '(dagbefolkning), alla branscher.')),
+              # TODO: förklaring av "Etablerade" (definition att bekräfta).
+              rd_kpi('Etablerade', textOutput(ns('box_etablerade'))),
+              rd_kpi('Andel av rikets syssels\u00e4ttning', textOutput(ns('box_andel')),
+                     paste('Sysselsatta med arbetsst\u00e4lle i vald geografi som andel av',
+                           'alla sysselsatta i riket.'))
           ),
 
           div(class = 'rd-card',

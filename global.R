@@ -28,7 +28,8 @@ source("https://raw.githubusercontent.com/Region-Dalarna/funktioner/main/func_sh
 #   R/func_data.R               databas-/demodataläsning (schema mikro_db, db oppna_data)
 #   R/func_data_yrke_utb.R      dataåtkomst yrke x utbildning (aggregeras i databasen)
 #   R/func_diagram.R            diagramhjälpare (ggiraph)
-#   R/func_diagram_yrke_utb.R   diagram för flik Utbildning & yrken
+#   R/func_diagram_yrke_utb.R   diagram för flikarna Utbildning & yrken, Matchning, Demografi
+#   R/func_ui.R                 delade UI-byggstenar (nyckeltalskort med förklaring)
 #   R/mod_oversikt.R            modul: flik Översikt
 #   R/mod_urval_yrke.R          gemensamma val för flikarna nedan
 #   R/mod_utbildning_yrken.R    modul: flik Utbildning & yrken

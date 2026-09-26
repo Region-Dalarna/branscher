@@ -24,24 +24,30 @@ mod_utbildning_yrken_ui <- function(id) {
         div(class = 'rd-field',
             selectInput(ns('utb_indelning_val'), 'Utbildningsindelning',
                         choices = stats::setNames(UTB_INDELNINGAR$kod_kol,
-                                                  UTB_INDELNINGAR$namn)))
+                                                  UTB_INDELNINGAR$namn),
+                        selected = UTB_INDELNINGAR$kod_kol[1]))
       ),
 
       div(class = 'rd-main',
 
           div(class = 'rd-kpi-row rd-kpi-row--4',
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Sysselsatta'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_sysselsatta')))),
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Antal yrken'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_yrken')))),
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Antal utbildningsgrupper'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_utb')))),
-              div(class = 'rd-kpi',
-                  div(class = 'rd-kpi__label', 'Rekryteringsbredd (median)'),
-                  div(class = 'rd-kpi__value', textOutput(ns('box_bredd'))))
+              rd_kpi('Sysselsatta', textOutput(ns('box_sysselsatta')),
+                     'Antal sysselsatta med arbetsst\u00e4lle i vald geografi och bransch.'),
+              rd_kpi('Antal yrken', textOutput(ns('box_yrken')),
+                     paste('Antal yrken (SSYK 2012, tresiffrig niv\u00e5) med minst en',
+                           'sysselsatt i urvalet. Ok\u00e4nt yrke r\u00e4knas inte.')),
+              rd_kpi('Antal utbildningsgrupper', textOutput(ns('box_utb')),
+                     paste('Antal utbildningsgrupper, enligt vald utbildningsindelning,',
+                           'med minst en sysselsatt i urvalet.')),
+              rd_kpi('Rekryteringsbredd (median)', textOutput(ns('box_bredd')),
+                     tagList(
+                       'Hur m\u00e5nga utbildningsgrupper som beh\u00f6vs f\u00f6r att t\u00e4cka 80 % av ',
+                       'de sysselsatta i ett yrke. V\u00e4rdet \u00e4r medianen \u00f6ver yrkena i urvalet ',
+                       '(yrken med minst ', MIN_NAMNARE, ' sysselsatta).', tags$br(), tags$br(),
+                       'Exempel: 3 betyder att 80 % av de sysselsatta i ett typiskt yrke har ',
+                       'n\u00e5gon av bara tre utbildningar \u2013 yrkena rekryterar smalt. ',
+                       'Ett h\u00f6gt v\u00e4rde betyder att yrkena rekryterar fr\u00e5n m\u00e5nga ',
+                       'olika utbildningar.'))
           ),
 
           div(class = 'rd-card',
@@ -51,7 +57,8 @@ mod_utbildning_yrken_ui <- function(id) {
                   'utbildning. Klicka på en utbildning för att se dess yrken nedan.'),
               div(class = 'rd-field rd-field--kort',
                   selectizeInput(ns('yrke_val'), 'Yrke', choices = NULL, width = '100%',
-                                 options = list(placeholder = 'Sök yrke…'))),
+                                 options = list(placeholder = 'Sök yrke…',
+                                                sortField = '$order'))),
               div(class = 'rd-split',
                   div(class = 'rd-split__main', girafeOutput(ns('plot_yrke_utb'), height = 'auto')),
                   div(class = 'rd-split__side',
@@ -66,7 +73,8 @@ mod_utbildning_yrken_ui <- function(id) {
                   'respektive yrke. Klicka på ett yrke för att se dess utbildningar ovan.'),
               div(class = 'rd-field rd-field--kort',
                   selectizeInput(ns('utb_val'), 'Utbildning', choices = NULL, width = '100%',
-                                 options = list(placeholder = 'Sök utbildning…'))),
+                                 options = list(placeholder = 'Sök utbildning…',
+                                                sortField = '$order'))),
               div(class = 'rd-split',
                   div(class = 'rd-split__main', girafeOutput(ns('plot_utb_yrke'), height = 'auto')),
                   div(class = 'rd-split__side',
@@ -74,11 +82,6 @@ mod_utbildning_yrken_ui <- function(id) {
                       uiOutput(ns('tabell_utb_yrke'))))
           ),
 
-          div(class = 'rd-info',
-              tags$strong('Rekryteringsbredd: '),
-              'antal utbildningsgrupper som tillsammans täcker 80 % av ett yrkes ',
-              'sysselsatta, median över yrkena i urvalet. Lågt värde = yrkena ',
-              'rekryterar från få utbildningar; högt = bred rekryteringsbas.')
       )
   )
 }
@@ -102,7 +105,12 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       dplyr::filter(yrke_x_utb(), kommun_kod == urval$geografi())
     )
 
-    # ---- Val av yrke/utbildning (sorterade efter storlek) ----------------
+    # ---- Val av yrke/utbildning --------------------------------------------
+    # Listorna är sorterade efter antal sysselsatta (störst först), och
+    # det största yrket/den största utbildningen väljs när urvalet ändras.
+    # Okänt yrke/utbildning finns kvar i listan men väljs aldrig som förval.
+    # Listorna skickas till webbläsaren (server = FALSE) -- några hundra
+    # alternativ -- så att ordningen behålls.
 
     shiny::observeEvent(vald_x_utb(), {
       yrken <- vald_x_utb() |>
@@ -111,14 +119,17 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       utb <- vald_x_utb() |>
         dplyr::count(utb_kod, utb_namn, wt = antal, sort = TRUE)
 
-      behall <- function(val, koder) if (isTRUE(val %in% koder)) val else koder[1]
+      forval <- function(kod, namn) {
+        kand <- kod[!.ar_okand(kod, namn)]
+        if (length(kand) > 0) kand[1] else kod[1]
+      }
 
-      updateSelectizeInput(session, 'yrke_val', server = TRUE,
+      updateSelectizeInput(session, 'yrke_val',
                            choices  = stats::setNames(yrken$yrke_kod, yrken$yrke_namn),
-                           selected = behall(input$yrke_val, yrken$yrke_kod))
-      updateSelectizeInput(session, 'utb_val', server = TRUE,
+                           selected = forval(yrken$yrke_kod, yrken$yrke_namn))
+      updateSelectizeInput(session, 'utb_val',
                            choices  = stats::setNames(utb$utb_kod, utb$utb_namn),
-                           selected = behall(input$utb_val, utb$utb_kod))
+                           selected = forval(utb$utb_kod, utb$utb_namn))
     })
 
     # Klick på en ruta väljer den i den andra mosaiken ("övr" = Övriga).

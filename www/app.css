@@ -37,3 +37,41 @@
 .rd-table--topp { width: 100%; font-size: 0.85rem; }
 .rd-table--topp .rd-num { text-align: right; white-space: nowrap; }
 .rd-table--topp tfoot th { border-top: 2px solid var(--rd-border); }
+
+/* ---- Nyckeltal med förklaring (rd_kpi() i R/func_ui.R) ------------------- */
+.rd-kpi--hjalp { position: relative; cursor: help; }
+.rd-kpi--hjalp:focus { outline: 2px solid var(--rd-primary); outline-offset: 2px; }
+.rd-hjalp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  vertical-align: 1px;
+}
+.rd-hjalp__text {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: calc(100% + 6px);
+  z-index: 50;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--rd-text, #212529);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.rd-kpi--hjalp:hover .rd-hjalp__text,
+.rd-kpi--hjalp:focus .rd-hjalp__text { opacity: 1; visibility: visible; }

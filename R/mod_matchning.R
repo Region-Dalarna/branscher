@@ -12,21 +12,25 @@
 mod_matchning_ui <- function(id) {
   ns <- NS(id)
 
-  kpi <- function(etikett, output_id) {
-    div(class = 'rd-kpi',
-        div(class = 'rd-kpi__label', etikett),
-        div(class = 'rd-kpi__value', textOutput(ns(output_id))))
-  }
-
   div(class = 'rd-app',
       mod_urval_yrke_ui(ns('urval')),
 
       div(class = 'rd-main',
           div(class = 'rd-kpi-row rd-kpi-row--4',
-              kpi('Helt matchade', 'box_helt'),
-              kpi('Delvis matchade', 'box_delvis'),
-              kpi('Inte matchade', 'box_inte'),
-              kpi('Utan tillräckliga uppgifter', 'box_utan')),
+              rd_kpi('Helt matchade', textOutput(ns('box_helt')),
+                     paste('Andel anst\u00e4llda vars utbildning helt matchar yrket, bland de',
+                           'anst\u00e4llda d\u00e4r matchningen kan bed\u00f6mas (helt, delvis eller',
+                           'inte matchade).')),
+              rd_kpi('Delvis matchade', textOutput(ns('box_delvis')),
+                     paste('Andel anst\u00e4llda vars utbildning delvis matchar yrket, bland de',
+                           'anst\u00e4llda d\u00e4r matchningen kan bed\u00f6mas.')),
+              rd_kpi('Inte matchade', textOutput(ns('box_inte')),
+                     paste('Andel anst\u00e4llda vars utbildning inte matchar yrket, bland de',
+                           'anst\u00e4llda d\u00e4r matchningen kan bed\u00f6mas.')),
+              rd_kpi('Utan tillr\u00e4ckliga uppgifter', textOutput(ns('box_utan')),
+                     paste('Andel av alla anst\u00e4llda d\u00e4r yrkes- eller utbildningsuppgift',
+                           'saknas, s\u00e5 att matchningen inte kan bed\u00f6mas. En h\u00f6g andel',
+                           'g\u00f6r \u00f6vriga andelar os\u00e4krare.'))),
 
           div(class = 'rd-card',
               h2('Matchning per yrke'),
@@ -75,8 +79,8 @@ mod_matchning_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     output$plot_matchning <- renderGirafe({
       d <- profil() |>
         dplyr::filter(gruppering %in% MATCHNING_GRUPPER) |>
-        fordelning_per_yrke('gruppering')
-      skapa_diagram_fordelning_per_yrke(
+        fordelning_per_enhet('gruppering')
+      skapa_diagram_fordelning(
         d, MATCHNING_GRUPPER, MATCHNING_FARGER,
         sortera_kategori = 'Helt matchade',
         underrubrik      = paste0(urval$underrubrik(), ' · sorterat efter andel helt matchade'),
