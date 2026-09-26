@@ -30,5 +30,8 @@ source("https://raw.githubusercontent.com/Region-Dalarna/funktioner/main/func_sh
 #   R/func_diagram.R            diagramhjälpare (ggiraph)
 #   R/func_diagram_yrke_utb.R   diagram för flik Utbildning & yrken
 #   R/mod_oversikt.R            modul: flik Översikt
+#   R/mod_urval_yrke.R          gemensamma val för flikarna nedan
 #   R/mod_utbildning_yrken.R    modul: flik Utbildning & yrken
+#   R/mod_matchning.R           modul: flik Matchning
+#   R/mod_demografi.R           modul: flik Demografi
 #   R/mod_flik_placeholder.R    platshållarmodul för flikar som inte är byggda än
