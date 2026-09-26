@@ -310,3 +310,51 @@ hamta_andel_utan_uppgifter <- function(ar_val, geografi, indelning_kolumn) {
     dplyr::filter(total >= MIN_NAMNARE) |>
     dplyr::mutate(andel = antal / total)
 }
+
+# ---- Åldersgrupper ----------------------------------------------------------
+
+# Undre/övre gräns för åldersgrupper som "20-29 år" eller "68+ år"
+# (övre = Inf). Grupper som inte går att tolka får NA.
+.alder_granser <- function(grupp) {
+  m <- regmatches(grupp, regexec("(\\d+)\\s*[-–]\\s*(\\d+)|(\\d+)\\s*\\+", grupp))
+  g <- vapply(m, function(x) {
+    if (length(x) == 0) c(NA_real_, NA_real_)
+    else if (nzchar(x[2])) as.numeric(x[2:3])
+    else c(as.numeric(x[4]), Inf)
+  }, numeric(2))
+  matrix(g, ncol = 2, byrow = TRUE)
+}
+
+# Åldersgrupper i åldersordning (yngst först).
+sortera_aldersgrupper <- function(grupper) {
+  grupper <- unique(grupper)
+  grupper[order(.alder_granser(grupper)[, 1], grupper)]
+}
+
+# Etikett för valda åldersgrupper där intilliggande grupper slås ihop:
+# "20-29 år" + "30-39 år" + "40-49 år" -> "20–49 år", "60-67" + "68+"
+# -> "60+ år", ej intilliggande -> "20–29 och 60–67 år".
+alder_etikett <- function(valda, alla) {
+  alla <- sortera_aldersgrupper(alla)
+  pos  <- sort(match(valda, alla))
+  g    <- .alder_granser(alla)
+  if (length(pos) == 0) return("")
+  if (anyNA(g[pos, ])) return(paste(valda, collapse = ", "))
+
+  delar <- vapply(split(pos, cumsum(c(1, diff(pos) != 1))), function(p) {
+    lo <- g[p[1], 1]; hi <- g[p[length(p)], 2]
+    if (is.infinite(hi)) paste0(lo, "+") else paste0(lo, "–", hi)
+  }, character(1))
+
+  lista <- if (length(delar) == 1) delar
+           else paste(paste(utils::head(delar, -1), collapse = ", "), "och", utils::tail(delar, 1))
+  paste(lista, "år")
+}
+
+# Förvald åldersgrupp för sortering: 68+ om den finns, annars äldsta.
+alder_forval <- function(alla) {
+  alla <- sortera_aldersgrupper(alla)
+  g <- .alder_granser(alla)
+  aldst <- alla[!is.na(g[, 1]) & g[, 1] >= 68]
+  if (length(aldst) > 0) aldst else utils::tail(alla, 1)
+}

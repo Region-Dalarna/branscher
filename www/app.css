@@ -68,3 +68,40 @@
 }
 .rd-kpi--hjalp:hover .rd-hjalp__text,
 .rd-kpi--hjalp:focus .rd-hjalp__text { opacity: 1; visibility: visible; }
+
+/* ---- Sorteringsval ovanför diagram (Demografi) --------------------------- */
+/* Kompakta "piller" (shinyWidgets checkbox-/radioGroupButtons,
+   individual = TRUE): valda är fyllda i primärfärgen. */
+.rd-sortering {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 6px;
+}
+.rd-sortering__label {
+  font-size: 0.8rem;
+  color: var(--rd-text-muted);
+  margin-right: 2px;
+}
+.rd-sortering .form-group { margin-bottom: 0; }
+.rd-sortering .form-group > br { display: none; }
+.rd-sortering .btn-group-container-sw { display: flex; flex-wrap: wrap; gap: 4px; }
+.rd-sortering .btn-group { margin: 0; }
+.rd-sortering .btn {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  padding: 3px 10px;
+  border: 1px solid var(--rd-border);
+  border-radius: 999px !important;
+  background: #fff;
+  color: var(--rd-text);
+  box-shadow: none;
+}
+.rd-sortering .btn:hover { border-color: var(--rd-primary); color: var(--rd-primary); }
+.rd-sortering .btn.active,
+.rd-sortering .btn.active:hover {
+  background: var(--rd-primary);
+  border-color: var(--rd-primary);
+  color: #fff;
+}

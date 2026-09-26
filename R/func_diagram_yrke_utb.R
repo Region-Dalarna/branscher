@@ -38,8 +38,8 @@ RD_KATEGORISK_2 <- c("#2a78d6", "#eb6834")
 # df från fordelning_per_enhet() (en rad per enhet = yrke/bransch och
 # kategori). kat_ordning = kategoriernas ordning, farger = namngiven
 # vektor (kategori -> färg). sortera_kategori: sortera enheterna efter
-# andelen i denna kategori (t.ex. "60-67 år"); NULL sorterar efter
-# storlek. markerad = enhet_kod som framhävs (övriga tonas ned).
+# den sammanlagda andelen i en eller flera kategorier (t.ex. "60-67 år"
+# och "68+ år"); NULL eller tom sorterar efter storlek. markerad = enhet_kod som framhävs (övriga tonas ned).
 skapa_diagram_fordelning <- function(df, kat_ordning, farger,
                                      markerad = NULL,
                                      sortera_kategori = NULL,
@@ -50,12 +50,12 @@ skapa_diagram_fordelning <- function(df, kat_ordning, farger,
     return(.girafe_std(.tom_plot("För få sysselsatta i urvalet för att visa fördelning")))
   }
 
-  ordning <- if (is.null(sortera_kategori)) {
+  ordning <- if (length(sortera_kategori) == 0) {
     d |> dplyr::distinct(enhet_namn, total) |> dplyr::arrange(total)
   } else {
     d |>
       dplyr::group_by(enhet_namn) |>
-      dplyr::summarise(s = sum(andel[kategori == sortera_kategori])) |>
+      dplyr::summarise(s = sum(andel[kategori %in% sortera_kategori])) |>
       dplyr::arrange(s)
   }
 

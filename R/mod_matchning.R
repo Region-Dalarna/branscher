@@ -5,8 +5,11 @@
 #  gruppering i mikro_db.utb_yrken_branscher).
 #   - Nyckeltal: andel helt/delvis/inte matchade (bland de tre) och
 #     andel anställda utan tillräckliga uppgifter (av anställda)
-#   - Matchning per yrke, de 20 största yrkena i urvalet
-#   - Andel anställda utan tillräckliga uppgifter per bransch
+#   - Underflik Branscher (förvald): matchning per bransch och andel
+#     anställda utan tillräckliga uppgifter per bransch. Alla branscher i
+#     vald indelning visas; vald bransch framhävs.
+#   - Underflik Yrken: matchning per yrke, de 20 största yrkena i urvalet
+#     (filtrerat på vald bransch)
 # =====================================================================
 
 mod_matchning_ui <- function(id) {
@@ -32,20 +35,31 @@ mod_matchning_ui <- function(id) {
                            'saknas, s\u00e5 att matchningen inte kan bed\u00f6mas. En h\u00f6g andel',
                            'g\u00f6r \u00f6vriga andelar os\u00e4krare.'))),
 
-          div(class = 'rd-card',
-              h2('Matchning per yrke'),
-              div(class = 'rd-subtitle',
-                  'De 20 största yrkena i urvalet. Andel helt, delvis och inte matchade ',
-                  'bland de anställda där matchningen kan bedömas.'),
-              girafeOutput(ns('plot_matchning'), height = 'auto')),
-
-          div(class = 'rd-card',
-              h2('Anställda utan tillräckliga uppgifter per bransch'),
-              div(class = 'rd-subtitle',
-                  'Andel av de anställda där yrkes- eller utbildningsuppgift saknas, ',
-                  'så att matchning inte kan bedömas. Stapel = vald geografi, ',
-                  'grå punkt = riket.'),
-              girafeOutput(ns('plot_utan_uppgifter'), height = 'auto')),
+          tabsetPanel(
+            id = ns('underflik'),
+            tabPanel('Branscher',
+                     div(class = 'rd-card',
+                         h2('Matchning per bransch'),
+                         div(class = 'rd-subtitle',
+                             'Alla branscher i vald branschindelning (vald bransch framhävs). ',
+                             'Andel helt, delvis och inte matchade bland de anställda där ',
+                             'matchningen kan bedömas.'),
+                         girafeOutput(ns('plot_matchning_bransch'), height = 'auto')),
+                     div(class = 'rd-card',
+                         h2('Anställda utan tillräckliga uppgifter per bransch'),
+                         div(class = 'rd-subtitle',
+                             'Andel av de anställda där yrkes- eller utbildningsuppgift saknas, ',
+                             'så att matchning inte kan bedömas. Stapel = vald geografi, ',
+                             'grå punkt = riket.'),
+                         girafeOutput(ns('plot_utan_uppgifter'), height = 'auto'))),
+            tabPanel('Yrken',
+                     div(class = 'rd-card',
+                         h2('Matchning per yrke'),
+                         div(class = 'rd-subtitle',
+                             'De 20 största yrkena i urvalet. Andel helt, delvis och inte matchade ',
+                             'bland de anställda där matchningen kan bedömas.'),
+                         girafeOutput(ns('plot_matchning_yrke'), height = 'auto')))
+          ),
 
           div(class = 'rd-info',
               tags$strong('Om matchning: '),
@@ -76,17 +90,33 @@ mod_matchning_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     output$box_utan   <- renderText(pct(andel_av_total(
       profil(), 'gruppering', MATCHNING_UTAN, bland = c(MATCHNING_GRUPPER, MATCHNING_UTAN))))
 
-    output$plot_matchning <- renderGirafe({
-      d <- profil() |>
+    # Alla branscher i vald indelning (inte filtrerat på vald bransch).
+    profil_bransch <- shiny::reactive(
+      hamta_bransch_profil(urval$ar(), urval$geografi(), urval$indelning(), 'gruppering')
+    ) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$indelning(), 'matchning_bransch')
+
+    matchning_per_enhet <- function(profil, n, markerad, underrubrik) {
+      d <- profil |>
         dplyr::filter(gruppering %in% MATCHNING_GRUPPER) |>
-        fordelning_per_enhet('gruppering')
+        fordelning_per_enhet('gruppering', n = n)
       skapa_diagram_fordelning(
         d, MATCHNING_GRUPPER, MATCHNING_FARGER,
+        markerad         = markerad,
         sortera_kategori = 'Helt matchade',
-        underrubrik      = paste0(urval$underrubrik(), ' · sorterat efter andel helt matchade'),
+        underrubrik      = paste0(underrubrik, ' · sorterat efter andel helt matchade'),
         kalla            = KALLA_YRKE_UTB
       )
-    })
+    }
+
+    # Branschdiagrammen visar alla branscher -- underrubriken nämner
+    # därför inte vald bransch.
+    output$plot_matchning_bransch <- renderGirafe(
+      matchning_per_enhet(profil_bransch(), Inf, urval$bransch(),
+                          paste0(urval$geo_namn(), ' · år ', urval$ar()))
+    )
+    output$plot_matchning_yrke <- renderGirafe(
+      matchning_per_enhet(profil(), 20, NULL, urval$underrubrik())
+    )
 
     utan_uppgifter <- shiny::reactive(
       hamta_andel_utan_uppgifter(urval$ar(), urval$geografi(), urval$indelning())

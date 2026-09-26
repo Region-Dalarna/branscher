@@ -3,35 +3,58 @@
 #
 #  Ålder, kön och bakgrund bland de sysselsatta
 #  (mikro_db.utb_yrken_branscher).
-#   - Nyckeltal för urvalet: andel i äldsta åldersgruppen, andel
-#     kvinnor, andel utrikes födda
+#   - Nyckeltal för urvalet: andel i valda åldersgrupper, andel av valt
+#     kön och andel med vald bakgrund (följer sorteringsvalen nedan)
 #   - Underflik Branscher (förvald): ålder/kön/bakgrund per bransch i
 #     vald indelning. Alla branscher visas; vald bransch framhävs.
 #   - Underflik Yrken: samma diagram för de 20 största yrkena i urvalet
 #     (filtrerat på vald bransch).
-#  Diagrammen i en dold underflik ritas inte förrän den visas.
+#
+#  Sortering: varje diagram har en rad med knappar ("Sortera efter
+#  andel"). Ålder: en eller flera åldersgrupper (förval 68+). Kön och
+#  bakgrund: ett av två (förval kvinnor resp. utrikes födda). Valen är
+#  gemensamma för underflikarna -- knapparna i Branscher och Yrken hålls
+#  i synk.
 # =====================================================================
+
+KON_VAL <- c('Kvinnor' = 'Kvinna', 'Män' = 'Man')
+# Startvärden innan datat lästs (radioGroupButtons kräver minst ett val);
+# ersätts av värdena i tabellen när fliken öppnas.
+BAKGRUND_VAL <- c('Utrikes födda' = 'Utrikes född', 'Inrikes födda' = 'Inrikes född')
 
 mod_demografi_ui <- function(id) {
   ns <- NS(id)
 
-  kort <- function(rubrik, underrubrik, output_id) {
+  sortering <- function(kontroll) {
+    div(class = 'rd-sortering',
+        span(class = 'rd-sortering__label', 'Sortera efter andel:'),
+        kontroll)
+  }
+  knappar_flera <- function(input_id) {
+    shinyWidgets::checkboxGroupButtons(ns(input_id), label = NULL, choices = character(0),
+                                       individual = TRUE, size = 'sm')
+  }
+  knappar_en <- function(input_id, choices, selected) {
+    shinyWidgets::radioGroupButtons(ns(input_id), label = NULL, choices = choices,
+                                    selected = selected, individual = TRUE, size = 'sm')
+  }
+  kort <- function(rubrik, underrubrik, kontroll, output_id) {
     div(class = 'rd-card',
         h2(rubrik),
         div(class = 'rd-subtitle', underrubrik),
+        sortering(kontroll),
         girafeOutput(ns(output_id), height = 'auto'))
   }
   diagram <- function(enhet, enheter_txt, suffix) {
     tagList(
-      kort(paste('Ålder per', enhet),
-           paste0(enheter_txt, ', sorterade efter andelen i den äldsta åldersgruppen ',
-                  '– en indikation på kommande pensionsavgångar.'),
+      kort(paste('Ålder per', enhet), enheter_txt,
+           knappar_flera(paste0('sort_alder_', suffix)),
            paste0('plot_alder_', suffix)),
-      kort(paste('Kön per', enhet),
-           paste0(enheter_txt, ', sorterade efter andelen kvinnor.'),
+      kort(paste('Kön per', enhet), enheter_txt,
+           knappar_en(paste0('sort_kon_', suffix), KON_VAL, 'Kvinna'),
            paste0('plot_kon_', suffix)),
-      kort(paste('Bakgrund per', enhet),
-           paste0(enheter_txt, ', sorterade efter andelen utrikes födda.'),
+      kort(paste('Bakgrund per', enhet), enheter_txt,
+           knappar_en(paste0('sort_bakgrund_', suffix), BAKGRUND_VAL, BAKGRUND_VAL[[1]]),
            paste0('plot_bakgrund_', suffix))
     )
   }
@@ -41,21 +64,21 @@ mod_demografi_ui <- function(id) {
 
       div(class = 'rd-main',
           div(class = 'rd-kpi-row',
-              rd_kpi(textOutput(ns('etikett_aldst'), inline = TRUE), textOutput(ns('box_aldst')),
-                     textOutput(ns('forklaring_aldst'), inline = TRUE)),
-              rd_kpi('Andel kvinnor', textOutput(ns('box_kvinnor')),
-                     'Andel kvinnor bland de sysselsatta i urvalet (vald geografi och bransch).'),
-              rd_kpi('Andel utrikes födda', textOutput(ns('box_utrikes')),
-                     'Andel utrikes födda bland de sysselsatta i urvalet (vald geografi och bransch).')),
+              rd_kpi(textOutput(ns('etikett_alder'), inline = TRUE), textOutput(ns('box_alder')),
+                     textOutput(ns('forklaring_alder'), inline = TRUE)),
+              rd_kpi(textOutput(ns('etikett_kon'), inline = TRUE), textOutput(ns('box_kon')),
+                     textOutput(ns('forklaring_kon'), inline = TRUE)),
+              rd_kpi(textOutput(ns('etikett_bakgrund'), inline = TRUE), textOutput(ns('box_bakgrund')),
+                     textOutput(ns('forklaring_bakgrund'), inline = TRUE))),
 
           tabsetPanel(
             id = ns('underflik'),
             tabPanel('Branscher',
                      diagram('bransch',
-                             'Alla branscher i vald branschindelning (vald bransch framhävs)',
+                             'Alla branscher i vald branschindelning (vald bransch framhävs).',
                              'bransch')),
             tabPanel('Yrken',
-                     diagram('yrke', 'De 20 största yrkena i urvalet', 'yrke'))
+                     diagram('yrke', 'De 20 största yrkena i urvalet.', 'yrke'))
           )
       )
   )
@@ -66,6 +89,7 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
 
     urval <- mod_urval_yrke_server('urval', aktiv)
     kat_kolumner <- c('alder', 'kon', 'bakgrund')
+    suffix <- c('bransch', 'yrke')
 
     # Yrken i urvalet (filtrerat på vald bransch) -- används även för
     # nyckeltalen, eftersom summan över yrken = hela urvalet.
@@ -78,22 +102,98 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       hamta_bransch_profil(urval$ar(), urval$geografi(), urval$indelning(), kat_kolumner)
     ) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$indelning(), 'demografi_bransch')
 
-    aldersgrupper <- shiny::reactive(sort(unique(profil_yrke()$alder)))
-    aldst         <- shiny::reactive(utils::tail(aldersgrupper(), 1))
-    utrikes       <- shiny::reactive(grep('^utrikes', unique(profil_yrke()$bakgrund),
-                                          ignore.case = TRUE, value = TRUE))
+    aldersgrupper <- shiny::reactive(sortera_aldersgrupper(profil_yrke()$alder))
+    # Bakgrunder med utrikes född först (förval och blå färg).
+    bakgrunder <- shiny::reactive({
+      b <- sort(unique(profil_yrke()$bakgrund))
+      utr <- grepl('^utrikes', b, ignore.case = TRUE)
+      c(b[utr], b[!utr])
+    })
+
+    # ---- Sorteringsval (gemensamma för underflikarna) --------------------
+
+    sort_alder    <- shiny::reactiveVal(character(0))
+    sort_kon      <- shiny::reactiveVal('Kvinna')
+    sort_bakgrund <- shiny::reactiveVal(NULL)
+
+    # Knapparnas etiketter: "Utrikes född" -> "Utrikes födda".
+    bakgrund_val <- shiny::reactive(stats::setNames(bakgrunder(), sub('född$', 'födda', bakgrunder())))
+
+    shiny::observeEvent(aldersgrupper(), {
+      val <- intersect(sort_alder(), aldersgrupper())
+      if (length(val) == 0) val <- alder_forval(aldersgrupper())
+      sort_alder(val)
+      for (s in suffix) {
+        shinyWidgets::updateCheckboxGroupButtons(session, paste0('sort_alder_', s),
+                                                 choices = aldersgrupper(), selected = val,
+                                                 size = 'sm')
+      }
+    })
+
+    shiny::observeEvent(bakgrunder(), {
+      val <- if (isTRUE(sort_bakgrund() %in% bakgrunder())) sort_bakgrund() else bakgrunder()[1]
+      sort_bakgrund(val)
+      for (s in suffix) {
+        shinyWidgets::updateRadioGroupButtons(session, paste0('sort_bakgrund_', s),
+                                              choices = bakgrund_val(), selected = val,
+                                              size = 'sm')
+      }
+    })
+
+    # Ett val i en underflik sparas och speglas till den andra. Ålder får
+    # vara tom (ignoreNULL = FALSE) -- då sorteras efter storlek.
+    synka <- function(namn, rv, uppdatera, tom_tillaten = FALSE) {
+      for (s in suffix) local({
+        egen <- paste0(namn, s)
+        andra <- paste0(namn, setdiff(suffix, s))
+        shiny::observeEvent(input[[egen]], ignoreInit = TRUE, ignoreNULL = !tom_tillaten, {
+          val <- input[[egen]] %||% character(0)
+          if (identical(sort(val), sort(rv()))) return()
+          rv(val)
+          uppdatera(session, andra, selected = val)
+        })
+      })
+    }
+    synka('sort_alder_', sort_alder, shinyWidgets::updateCheckboxGroupButtons, tom_tillaten = TRUE)
+    synka('sort_kon_', sort_kon, shinyWidgets::updateRadioGroupButtons)
+    synka('sort_bakgrund_', sort_bakgrund, shinyWidgets::updateRadioGroupButtons)
+
+    # ---- Texter som följer valen ----------------------------------------
+
+    alder_txt <- shiny::reactive(alder_etikett(sort_alder(), aldersgrupper()))
+    kon_txt   <- shiny::reactive(c(Kvinna = 'kvinnor', Man = 'män')[[sort_kon()]])
+    bakgrund_txt <- shiny::reactive({
+      shiny::req(sort_bakgrund())
+      tolower(sub('född$', 'födda', sort_bakgrund()))
+    })
 
     # ---- Nyckeltal -------------------------------------------------------
 
     pct <- function(x) if (is.na(x)) '–' else scales::percent(x, accuracy = 0.1, decimal.mark = ',')
 
-    output$etikett_aldst    <- renderText(paste('Andel', aldst()))
-    output$forklaring_aldst <- renderText(paste0(
-      'Andel av de sysselsatta i urvalet som är ', aldst(),
-      ' – en indikation på hur stor del som går i pension de närmaste åren.'))
-    output$box_aldst   <- renderText(pct(andel_av_total(profil_yrke(), 'alder', aldst())))
-    output$box_kvinnor <- renderText(pct(andel_av_total(profil_yrke(), 'kon', 'Kvinna')))
-    output$box_utrikes <- renderText(pct(andel_av_total(profil_yrke(), 'bakgrund', utrikes())))
+    output$etikett_alder <- renderText(
+      if (length(sort_alder()) == 0) 'Andel i vald ålder' else paste('Andel', alder_txt())
+    )
+    output$box_alder <- renderText(
+      if (length(sort_alder()) == 0) '–'
+      else pct(andel_av_total(profil_yrke(), 'alder', sort_alder()))
+    )
+    output$forklaring_alder <- renderText(paste(
+      'Andel av de sysselsatta i urvalet (vald geografi och bransch) i de åldersgrupper',
+      'som är valda för sorteringen av åldersdiagrammet. De äldsta grupperna ger en',
+      'indikation på kommande pensionsavgångar.'))
+
+    output$etikett_kon <- renderText(paste('Andel', kon_txt()))
+    output$box_kon     <- renderText(pct(andel_av_total(profil_yrke(), 'kon', sort_kon())))
+    output$forklaring_kon <- renderText(paste0(
+      'Andel ', kon_txt(), ' bland de sysselsatta i urvalet (vald geografi och bransch). ',
+      'Följer valet i könsdiagrammets sortering.'))
+
+    output$etikett_bakgrund <- renderText(paste('Andel', bakgrund_txt()))
+    output$box_bakgrund     <- renderText(pct(andel_av_total(profil_yrke(), 'bakgrund', sort_bakgrund())))
+    output$forklaring_bakgrund <- renderText(paste0(
+      'Andel ', bakgrund_txt(), ' bland de sysselsatta i urvalet (vald geografi och bransch). ',
+      'Följer valet i bakgrundsdiagrammets sortering.'))
 
     # ---- Diagram (samma tre för branscher och yrken) --------------------
 
@@ -114,19 +214,19 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
           kat <- aldersgrupper()
           fordelning(profil(), n, markerad(), underrubrik(), 'alder', kat,
                      stats::setNames(rd_sekventiell(length(kat)), kat),
-                     aldst(), paste('andel', aldst()))
+                     sort_alder(),
+                     if (length(sort_alder()) == 0) 'storlek' else paste('andel', alder_txt()))
         },
         kon = function() {
-          fordelning(profil(), n, markerad(), underrubrik(), 'kon', c('Kvinna', 'Man'),
+          fordelning(profil(), n, markerad(), underrubrik(), 'kon', unname(KON_VAL),
                      c('Kvinna' = unname(KON_FARGER['Kvinnor']), 'Man' = unname(KON_FARGER['Män'])),
-                     'Kvinna', 'andel kvinnor')
+                     sort_kon(), paste('andel', kon_txt()))
         },
         bakgrund = function() {
-          # Utrikes födda först, så att sorteringen och färgen (blå) följs åt.
-          kat <- c(utrikes(), setdiff(sort(unique(profil()$bakgrund)), utrikes()))
+          kat <- bakgrunder()
           fordelning(profil(), n, markerad(), underrubrik(), 'bakgrund', kat,
                      stats::setNames(c(RD_KATEGORISK_2, rep('grey70', 8))[seq_along(kat)], kat),
-                     utrikes()[1], 'andel utrikes födda')
+                     sort_bakgrund(), paste('andel', bakgrund_txt()))
         }
       )
     }
