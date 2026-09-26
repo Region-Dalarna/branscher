@@ -41,8 +41,16 @@ mod_oversikt_ui <- function(id) {
               rd_kpi('Sysselsatta', textOutput(ns('box_sysselsatta')),
                      paste('Antal sysselsatta med arbetsst\u00e4lle i vald geografi',
                            '(dagbefolkning), alla branscher.')),
-              # TODO: förklaring av "Etablerade" (definition att bekräfta).
-              rd_kpi('Etablerade', textOutput(ns('box_etablerade'))),
+              rd_kpi('Etablerade', textOutput(ns('box_etablerade')),
+                     tagList(
+                       'Sysselsatta som \u00e4r etablerade p\u00e5 arbetsmarknaden. Bara anst\u00e4llda ',
+                       '(hel\u00e5rsanst\u00e4llda, nyanst\u00e4llda, avg\u00e5ngna och del\u00e5rsanst\u00e4llda) kan ',
+                       'r\u00e4knas som etablerade \u2013 egenf\u00f6retagare styr i viss m\u00e5n sin egen ',
+                       'inkomst, s\u00e5 f\u00f6r dem g\u00e5r etablering inte att ber\u00e4kna.', tags$br(), tags$br(),
+                       'Fr\u00e5n och med 2020 kr\u00e4vs en inkomst p\u00e5 minst 3 inkomstbasbelopp; ',
+                       'f\u00f6re 2020 minst 60 % av medianinkomsten f\u00f6r personer med kort ',
+                       'f\u00f6rgymnasial utbildning (per \u00e5ldersgrupp och k\u00f6n). I b\u00e5da fallen ',
+                       'f\u00e5r personen inte ha haft arbetsl\u00f6shetsers\u00e4ttning under \u00e5ret.')),
               rd_kpi('Andel av rikets syssels\u00e4ttning', textOutput(ns('box_andel')),
                      paste('Sysselsatta med arbetsst\u00e4lle i vald geografi som andel av',
                            'alla sysselsatta i riket.'))
