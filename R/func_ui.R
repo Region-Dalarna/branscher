@@ -19,3 +19,10 @@ rd_kpi <- function(etikett, varde, forklaring = NULL) {
       div(class = 'rd-kpi__value', varde),
       div(class = 'rd-hjalp__text', role = 'tooltip', forklaring))
 }
+
+# Sökväg till en fil i www/ med versionsnyckel (?v=<md5>), så att
+# webbläsaren hämtar om filen när den ändrats i stället för att använda
+# en gammal cachad version.
+www_version <- function(fil) {
+  paste0(fil, '?v=', substr(unname(tools::md5sum(file.path('www', fil))), 1, 8))
+}

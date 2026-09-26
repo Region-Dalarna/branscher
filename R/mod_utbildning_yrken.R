@@ -59,11 +59,10 @@ mod_utbildning_yrken_ui <- function(id) {
                   selectizeInput(ns('yrke_val'), 'Yrke', choices = NULL, width = '100%',
                                  options = list(placeholder = 'Sök yrke…',
                                                 sortField = '$order'))),
-              div(class = 'rd-split',
-                  div(class = 'rd-split__main', girafeOutput(ns('plot_yrke_utb'), height = 'auto')),
-                  div(class = 'rd-split__side',
-                      h3('De fem vanligaste utbildningarna'),
-                      uiOutput(ns('tabell_yrke_utb'))))
+              girafeOutput(ns('plot_yrke_utb'), height = 'auto'),
+              div(class = 'rd-topp',
+                  h3('De fem vanligaste utbildningarna'),
+                  uiOutput(ns('tabell_yrke_utb')))
           ),
 
           div(class = 'rd-card',
@@ -75,11 +74,10 @@ mod_utbildning_yrken_ui <- function(id) {
                   selectizeInput(ns('utb_val'), 'Utbildning', choices = NULL, width = '100%',
                                  options = list(placeholder = 'Sök utbildning…',
                                                 sortField = '$order'))),
-              div(class = 'rd-split',
-                  div(class = 'rd-split__main', girafeOutput(ns('plot_utb_yrke'), height = 'auto')),
-                  div(class = 'rd-split__side',
-                      h3('De fem vanligaste yrkena'),
-                      uiOutput(ns('tabell_utb_yrke'))))
+              girafeOutput(ns('plot_utb_yrke'), height = 'auto'),
+              div(class = 'rd-topp',
+                  h3('De fem vanligaste yrkena'),
+                  uiOutput(ns('tabell_utb_yrke')))
           ),
 
       )
@@ -108,7 +106,9 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     # ---- Val av yrke/utbildning --------------------------------------------
     # Listorna är sorterade efter antal sysselsatta (störst först), och
     # det största yrket/den största utbildningen väljs när urvalet ändras.
-    # Okänt yrke/utbildning finns kvar i listan men väljs aldrig som förval.
+    # Undantag: med Alla branscher är grundskoleutbildning oftast störst
+    # och säger lite -- då väljs den näst största utbildningen i stället.
+    # Okänt finns kvar i listan men väljs aldrig som förval.
     # Listorna skickas till webbläsaren (server = FALSE) -- några hundra
     # alternativ -- så att ordningen behålls.
 
@@ -119,17 +119,23 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       utb <- vald_x_utb() |>
         dplyr::count(utb_kod, utb_namn, wt = antal, sort = TRUE)
 
-      forval <- function(kod, namn) {
-        kand <- kod[!.ar_okand(kod, namn)]
-        if (length(kand) > 0) kand[1] else kod[1]
+      # hoppa_over: funktion(namn) -> TRUE om den största kända ska
+      # hoppas över till förmån för den näst största.
+      forval <- function(kod, namn, hoppa_over = function(namn) FALSE) {
+        kanda <- !.ar_okand(kod, namn)
+        kand <- kod[kanda]
+        if (length(kand) == 0) return(kod[1])
+        if (length(kand) > 1 && hoppa_over(namn[kanda][1])) kand[2] else kand[1]
       }
+      alla_branscher <- !nzchar(urval$bransch())
+      grundskola <- function(namn) alla_branscher && grepl('grundskol', namn, ignore.case = TRUE)
 
       updateSelectizeInput(session, 'yrke_val',
                            choices  = stats::setNames(yrken$yrke_kod, yrken$yrke_namn),
                            selected = forval(yrken$yrke_kod, yrken$yrke_namn))
       updateSelectizeInput(session, 'utb_val',
                            choices  = stats::setNames(utb$utb_kod, utb$utb_namn),
-                           selected = forval(utb$utb_kod, utb$utb_namn))
+                           selected = forval(utb$utb_kod, utb$utb_namn, hoppa_over = grundskola))
     })
 
     # Klick på en ruta väljer den i den andra mosaiken ("övr" = Övriga).

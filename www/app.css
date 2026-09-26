@@ -18,22 +18,15 @@
 /* Väljare inuti ett kort (t.ex. yrke/utbildning ovanför en mosaik). */
 .rd-field--kort { max-width: 520px; margin: 4px 0 8px; }
 
-/* Diagram + sidotabell bredvid varandra, staplas på smala skärmar. */
-.rd-split {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  align-items: flex-start;
-}
-.rd-split__main { flex: 3 1 480px; min-width: 0; }
-.rd-split__side { flex: 1 1 260px; min-width: 0; }
-.rd-split__side h3 {
+/* Topplista under en mosaik. */
+.rd-topp { max-width: 760px; margin-top: 16px; }
+.rd-topp h3 {
   font-size: 0.95rem;
   font-weight: 600;
-  margin: 8px 0 8px;
+  margin: 0 0 8px;
 }
 
-/* Topplistetabell bredvid mosaiken. */
+/* Topplistetabellen. */
 .rd-table--topp { width: 100%; font-size: 0.85rem; }
 .rd-table--topp .rd-num { text-align: right; white-space: nowrap; }
 .rd-table--topp tfoot th { border-top: 2px solid var(--rd-border); }

@@ -129,7 +129,7 @@ mod_oversikt_server <- function(id) {
       totalt <- hamta_total_sysselsatta('00', ar_int)  # riket
 
       if (is.na(valt) || is.na(totalt) || totalt == 0) return('\u2013')
-      scales::percent(valt / totalt, accuracy = 0.1)
+      scales::percent(valt / totalt, accuracy = 0.1, decimal.mark = ',')
     })
 
     output$plot_jamforelse <- renderGirafe({
