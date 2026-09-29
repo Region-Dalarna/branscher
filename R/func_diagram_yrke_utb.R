@@ -40,7 +40,9 @@ RD_KATEGORISK_2 <- c("#2a78d6", "#eb6834")
 # vektor (kategori -> färg). sortera_kategori: sortera enheterna efter
 # den sammanlagda andelen i en eller flera kategorier (t.ex. "60-67 år"
 # och "68+ år"); NULL eller tom sorterar efter storlek. markerad = en
-# eller flera enhet_kod som framhävs (övriga tonas ned).
+# eller flera enhet_kod som framhävs med en ljus bakgrundsrand och fet
+# etikett (ggtext) -- staplarnas färger ändras inte, så legenden gäller
+# alla rader.
 skapa_diagram_fordelning <- function(df, kat_ordning, farger,
                                      markerad = NULL,
                                      sortera_kategori = NULL,
@@ -61,21 +63,29 @@ skapa_diagram_fordelning <- function(df, kat_ordning, farger,
   }
 
   markerad <- markerad[nzchar(markerad %||% character(0))]
-  markerat <- length(markerad) > 0
   d <- d |>
     dplyr::mutate(
       enhet_namn = factor(enhet_namn, levels = ordning$enhet_namn),
       kategori  = factor(kategori, levels = rev(kat_ordning)),
-      alfa      = if (markerat) dplyr::if_else(enhet_kod %in% markerad, 1, 0.45) else 1,
       etikett   = dplyr::if_else(andel >= 0.1, scales::percent(andel, accuracy = 1), ""),
-      # Nedtonade rader: mörk text (vit text blir oläslig på blek fyllning).
-      etikettfarg = dplyr::if_else(alfa < 1, RD_TEXT, .etikettfarg(farger[as.character(kategori)]))
+      etikettfarg = .etikettfarg(farger[as.character(kategori)])
     )
 
+  # Markerade rader: ljus rand bakom hela raden + fet etikett på y-axeln.
+  # Etiketterna är markdown/HTML (ggtext::element_markdown): radbrytning
+  # med <br>, specialtecken escapade.
+  rand <- d |> dplyr::filter(enhet_kod %in% markerad) |> dplyr::distinct(enhet_namn)
+  etiketter <- function(x) {
+    txt <- gsub("\n", "<br>", htmltools::htmlEscape(scales::label_wrap(45)(x)))
+    ifelse(x %in% rand$enhet_namn, paste0("<b>", txt, "</b>"), txt)
+  }
+
   g <- ggplot2::ggplot(d, ggplot2::aes(x = andel, y = enhet_namn, fill = kategori, group = kategori)) +
+    ggplot2::geom_tile(data = rand, ggplot2::aes(x = 0.5, y = enhet_namn),
+                       width = 1.02, height = 0.96, fill = "#d6ebf2",
+                       inherit.aes = FALSE) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(
-        alpha   = alfa,
         tooltip = paste0("<b>", enhet_namn, "</b><br/>", kategori, ": ",
                          scales::percent(andel, accuracy = 0.1),
                          " (", .antal_txt(antal), " av ",
@@ -91,8 +101,7 @@ skapa_diagram_fordelning <- function(df, kat_ordning, farger,
     ggplot2::scale_fill_manual(values = farger, breaks = kat_ordning, name = NULL,
                                drop = TRUE) +
     ggplot2::scale_color_identity() +
-    ggplot2::scale_alpha_identity() +
-    ggplot2::scale_y_discrete(labels = scales::label_wrap(45)) +
+    ggplot2::scale_y_discrete(labels = etiketter) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),
                                 expand = ggplot2::expansion(mult = c(0, 0.01))) +
     ggplot2::labs(x = NULL, y = NULL,
@@ -100,7 +109,12 @@ skapa_diagram_fordelning <- function(df, kat_ordning, farger,
     .rd_tema() +
     ggplot2::theme(legend.position = "top",
                    legend.justification = "left",
-                   panel.grid.major.x = ggplot2::element_blank()) +
+                   panel.grid.major.x = ggplot2::element_blank(),
+                   # .left: ggplot2 4 har ett eget element_text för vänster
+                   # y-axel som annars vinner över axis.text.y.
+                   axis.text.y.left = ggtext::element_markdown(hjust = 1, halign = 1,
+                                                               lineheight = 1.1,
+                                                               margin = ggplot2::margin(r = 4))) +
     ggplot2::guides(fill = ggplot2::guide_legend(nrow = ceiling(length(kat_ordning) / 4)))
 
   .girafe_std(g,
