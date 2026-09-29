@@ -105,3 +105,27 @@
   border-color: var(--rd-primary);
   color: #fff;
 }
+
+/* Liten rad under nyckeltalets värde (rd_kpi(under = ...)): vilket urval
+   siffran gäller. */
+.rd-kpi__under {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--rd-text-muted);
+}
+
+/* Yrkesväljare (yrkesval_ui() i R/func_ui.R): sökruta + kryssruta på en
+   rad, kryssrutan under sökrutan på smala skärmar. */
+.rd-yrkesval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 4px 0 8px;
+}
+.rd-yrkesval__sok { flex: 1 1 320px; max-width: 560px; }
+.rd-yrkesval .form-group,
+.rd-yrkesval .checkbox { margin: 0; }
+.rd-yrkesval__bara label { font-size: 0.85rem; font-weight: 400; }
+/* Överst i en underflik (ovanför korten). */
+.rd-yrkesval--underflik { margin: 12px 0 4px; }

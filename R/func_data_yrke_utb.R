@@ -126,12 +126,14 @@ hamta_yrke_utb <- function(ar_val, geografier, dims, branschkoder = NULL,
     dplyr::select(-regionkod_ast)
 }
 
-# Branschkoder (SNI 2-siffrigt) som hör till en grupp i en indelning.
-# grupp_namn = "" (Alla branscher) ger NULL, dvs. inget branschfilter.
+# Branschkoder (SNI 2-siffrigt) som hör till en eller flera grupper i
+# en indelning. Inga grupper ("" = Alla branscher) ger NULL, dvs. inget
+# branschfilter.
 hamta_branschkoder <- function(indelning_kolumn, grupp_namn) {
-  if (is.null(grupp_namn) || !nzchar(grupp_namn)) return(NULL)
+  grupp_namn <- grupp_namn[nzchar(grupp_namn %||% character(0))]
+  if (length(grupp_namn) == 0) return(NULL)
   hamta_dim_bransch() |>
-    dplyr::filter(.data[[indelning_kolumn]] == grupp_namn) |>
+    dplyr::filter(.data[[indelning_kolumn]] %in% grupp_namn) |>
     dplyr::pull(branschkod)
 }
 
@@ -200,6 +202,23 @@ hamta_bransch_profil <- function(ar_val, geografi, indelning_kolumn, kat_kolumne
     dplyr::summarise(antal = sum(antal), .groups = "drop")
 }
 
+# Antal valda enheter som inte kan visas: saknas i profilen eller har
+# färre än MIN_NAMNARE sysselsatta.
+antal_for_sma <- function(profil, valda) {
+  n <- profil |>
+    dplyr::filter(enhet_kod %in% valda) |>
+    dplyr::group_by(enhet_kod) |>
+    dplyr::summarise(n = sum(antal))
+  sum(n$n < MIN_NAMNARE) + length(setdiff(valda, n$enhet_kod))
+}
+
+# Text till en underrubrik när valda enheter inte kan visas.
+notis_for_sma <- function(antal, vad = "sysselsatta") {
+  if (antal == 0) return("")
+  paste0(" \u00b7 ", antal, if (antal == 1) " valt yrke har" else " valda yrken har",
+         " f\u00e4rre \u00e4n ", MIN_NAMNARE, " ", vad, " och visas inte")
+}
+
 # Andel av totalen i en profil-df där kat_kol har något av värdena.
 # NA om underlaget är mindre än MIN_NAMNARE.
 andel_av_total <- function(profil, kat_kol, varden, bland = NULL) {
@@ -221,10 +240,15 @@ storsta_enheter <- function(profil, n = 20) {
     dplyr::slice_max(antal, n = n, with_ties = FALSE)
 }
 
-# Fördelning över en kategorikolumn per enhet, för de n största.
+# Fördelning över en kategorikolumn per enhet, för de n största. Valda
+# enheter (enhet_kod i `enheter`) tas alltid med och fylls på med de
+# största övriga upp till n -- de minsta av de n största faller bort.
 # Andelar för enheter med färre än MIN_NAMNARE sysselsatta sätts till NA.
-fordelning_per_enhet <- function(profil, kat_kol, n = 20) {
-  topp <- storsta_enheter(profil, n)
+fordelning_per_enhet <- function(profil, kat_kol, n = 20, enheter = NULL) {
+  fyll <- storsta_enheter(profil, Inf) |>
+    dplyr::filter(!enhet_kod %in% enheter) |>
+    utils::head(max(0, n - length(enheter)))
+  topp <- tibble::tibble(enhet_kod = unique(c(enheter, fyll$enhet_kod)))
 
   profil |>
     dplyr::semi_join(topp, by = "enhet_kod") |>

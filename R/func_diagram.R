@@ -71,7 +71,7 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "",
                                 levels = c("riket", "lan", "vald"),
                                 labels = c("Riket", "L\u00e4net", "Vald geografi")
       ),
-      markerad = grupp_namn == markerad_grupp
+      markerad = grupp_namn %in% markerad_grupp
     )
 
   ordning <- d |>

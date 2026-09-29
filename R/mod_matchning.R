@@ -9,7 +9,8 @@
 #     anställda utan tillräckliga uppgifter per bransch. Alla branscher i
 #     vald indelning visas; vald bransch framhävs.
 #   - Underflik Yrken: matchning per yrke, de 20 största yrkena i urvalet
-#     (filtrerat på vald bransch)
+#     (filtrerat på vald bransch) -- eller de yrken man söker fram och
+#     väljer i rutan ovanför diagrammet
 # =====================================================================
 
 mod_matchning_ui <- function(id) {
@@ -56,8 +57,11 @@ mod_matchning_ui <- function(id) {
                      div(class = 'rd-card',
                          h2('Matchning per yrke'),
                          div(class = 'rd-subtitle',
-                             'De 20 största yrkena i urvalet. Andel helt, delvis och inte matchade ',
-                             'bland de anställda där matchningen kan bedömas.'),
+                             'De 20 största yrkena i urvalet. Yrken du lägger till nedan framhävs ',
+                             'och ersätter de minsta \u2013 eller visas ensamma med \u201cVisa bara valda yrken\u201d. ',
+                             'Andel helt, delvis och inte matchade bland de anställda där ',
+                             'matchningen kan bedömas.'),
+                         yrkesval_ui(ns),
                          girafeOutput(ns('plot_matchning_yrke'), height = 'auto')))
           ),
 
@@ -95,10 +99,10 @@ mod_matchning_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       hamta_bransch_profil(urval$ar(), urval$geografi(), urval$indelning(), 'gruppering')
     ) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$indelning(), 'matchning_bransch')
 
-    matchning_per_enhet <- function(profil, n, markerad, underrubrik) {
+    matchning_per_enhet <- function(profil, n, markerad, underrubrik, enheter = NULL) {
       d <- profil |>
         dplyr::filter(gruppering %in% MATCHNING_GRUPPER) |>
-        fordelning_per_enhet('gruppering', n = n)
+        fordelning_per_enhet('gruppering', n = n, enheter = enheter)
       skapa_diagram_fordelning(
         d, MATCHNING_GRUPPER, MATCHNING_FARGER,
         markerad         = markerad,
@@ -114,9 +118,33 @@ mod_matchning_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       matchning_per_enhet(profil_bransch(), Inf, urval$bransch(),
                           paste0(urval$geo_namn(), ' · år ', urval$ar()))
     )
-    output$plot_matchning_yrke <- renderGirafe(
-      matchning_per_enhet(profil(), 20, NULL, urval$underrubrik())
-    )
+    # ---- Egna yrken i Yrken-fliken ---------------------------------------
+    # Listan sorteras efter antal sysselsatta i urvalet. Valda yrken som
+    # inte finns i ett nytt urval tas bort.
+
+    shiny::observeEvent(profil(), {
+      yrken <- profil() |>
+        dplyr::filter(!enhet_kod %in% c('***', 'saknas')) |>
+        dplyr::count(enhet_kod, enhet_namn, wt = antal, sort = TRUE)
+      updateSelectizeInput(session, 'yrken_val',
+                           choices  = stats::setNames(yrken$enhet_kod, yrken$enhet_namn),
+                           selected = intersect(input$yrken_val, yrken$enhet_kod))
+    })
+
+    # Valda yrken läggs till bland de 20 största (de minsta faller bort)
+    # och framhävs. Yrken med för litet underlag visas inte -- säg hur många.
+    output$plot_matchning_yrke <- renderGirafe({
+      valda <- input$yrken_val %||% character(0)
+      bara  <- isTRUE(input$bara_valda)
+      if (bara && length(valda) == 0) {
+        return(.girafe_std(.tom_plot('L\u00e4gg till yrken i s\u00f6krutan ovan'), height_svg = 1.5))
+      }
+      notis <- notis_for_sma(
+        antal_for_sma(dplyr::filter(profil(), gruppering %in% MATCHNING_GRUPPER), valda),
+        'anställda med bedömd matchning')
+      matchning_per_enhet(profil(), if (bara) 0 else 20, if (bara) NULL else valda,
+                          paste0(urval$underrubrik(), notis), enheter = valda)
+    })
 
     utan_uppgifter <- shiny::reactive(
       hamta_andel_utan_uppgifter(urval$ar(), urval$geografi(), urval$indelning())

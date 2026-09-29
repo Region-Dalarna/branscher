@@ -78,7 +78,13 @@ mod_demografi_ui <- function(id) {
                              'Alla branscher i vald branschindelning (vald bransch framhävs).',
                              'bransch')),
             tabPanel('Yrken',
-                     diagram('yrke', 'De 20 största yrkena i urvalet.', 'yrke'))
+                     yrkesval_ui(ns, 'S\u00f6k och l\u00e4gg till yrken i diagrammen\u2026',
+                                 class = 'rd-yrkesval--underflik'),
+                     diagram('yrke',
+                             paste('De 20 största yrkena i urvalet. Yrken du lägger till ovan',
+                                   'framhävs och ersätter de minsta \u2013 eller visas ensamma med',
+                                   '\u201cVisa bara valda yrken\u201d.'),
+                             'yrke'))
           )
       )
   )
@@ -197,9 +203,13 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
 
     # ---- Diagram (samma tre för branscher och yrken) --------------------
 
-    fordelning <- function(profil, n, markerad, underrubrik, kat_kol, kat, farger, sortera, sort_txt) {
+    fordelning <- function(profil, n, markerad, underrubrik, kat_kol, kat, farger, sortera, sort_txt,
+                           enheter = NULL) {
+      if (n == 0 && length(enheter) == 0) {
+        return(.girafe_std(.tom_plot('L\u00e4gg till yrken i s\u00f6krutan ovan'), height_svg = 1.5))
+      }
       skapa_diagram_fordelning(
-        fordelning_per_enhet(profil, kat_kol, n = n), kat, farger,
+        fordelning_per_enhet(profil, kat_kol, n = n, enheter = enheter), kat, farger,
         markerad         = markerad,
         sortera_kategori = sortera,
         underrubrik      = paste0(underrubrik, ' · sorterat efter ', sort_txt),
@@ -207,36 +217,55 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       )
     }
 
-    # underrubrik: funktion som ger diagrammens underrubrik.
-    rita <- function(profil, n, markerad, underrubrik) {
+    # n, markerad, underrubrik och enheter är funktioner (reaktiva).
+    # enheter: enheter som läggs till bland de n största (n = 0: bara de).
+    rita <- function(profil, n, markerad, underrubrik, enheter = function() NULL) {
       list(
         alder = function() {
           kat <- aldersgrupper()
-          fordelning(profil(), n, markerad(), underrubrik(), 'alder', kat,
+          fordelning(profil(), n(), markerad(), underrubrik(), 'alder', kat,
                      stats::setNames(rd_sekventiell(length(kat)), kat),
                      sort_alder(),
-                     if (length(sort_alder()) == 0) 'storlek' else paste('andel', alder_txt()))
+                     if (length(sort_alder()) == 0) 'storlek' else paste('andel', alder_txt()),
+                     enheter())
         },
         kon = function() {
-          fordelning(profil(), n, markerad(), underrubrik(), 'kon', unname(KON_VAL),
+          fordelning(profil(), n(), markerad(), underrubrik(), 'kon', unname(KON_VAL),
                      c('Kvinna' = unname(KON_FARGER['Kvinnor']), 'Man' = unname(KON_FARGER['Män'])),
-                     sort_kon(), paste('andel', kon_txt()))
+                     sort_kon(), paste('andel', kon_txt()), enheter())
         },
         bakgrund = function() {
           kat <- bakgrunder()
-          fordelning(profil(), n, markerad(), underrubrik(), 'bakgrund', kat,
+          fordelning(profil(), n(), markerad(), underrubrik(), 'bakgrund', kat,
                      stats::setNames(c(RD_KATEGORISK_2, rep('grey70', 8))[seq_along(kat)], kat),
-                     sort_bakgrund(), paste('andel', bakgrund_txt()))
+                     sort_bakgrund(), paste('andel', bakgrund_txt()), enheter())
         }
       )
     }
 
     # Branschdiagrammen visar alla branscher -- underrubriken nämner
     # därför inte vald bransch.
-    bransch <- rita(profil_bransch, n = Inf, markerad = urval$bransch,
+    bransch <- rita(profil_bransch, n = function() Inf, markerad = urval$bransch,
                     underrubrik = function() paste0(urval$geo_namn(), ' · år ', urval$ar()))
-    yrke    <- rita(profil_yrke, n = 20, markerad = function() NULL,
-                    underrubrik = urval$underrubrik)
+    # Yrken: valda yrken läggs till bland de 20 största och framhävs --
+    # eller visas ensamma ("Visa bara valda yrken").
+    valda_yrken <- shiny::reactive(input$yrken_val %||% character(0))
+    bara_valda  <- shiny::reactive(isTRUE(input$bara_valda))
+    yrke    <- rita(profil_yrke,
+                    n        = function() if (bara_valda()) 0 else 20,
+                    markerad = function() if (bara_valda()) NULL else valda_yrken(),
+                    enheter  = valda_yrken,
+                    underrubrik = function() paste0(
+                      urval$underrubrik(), notis_for_sma(antal_for_sma(profil_yrke(), valda_yrken()))))
+
+    shiny::observeEvent(profil_yrke(), {
+      yrken <- profil_yrke() |>
+        dplyr::filter(!enhet_kod %in% c('***', 'saknas')) |>
+        dplyr::count(enhet_kod, enhet_namn, wt = antal, sort = TRUE)
+      updateSelectizeInput(session, 'yrken_val',
+                           choices  = stats::setNames(yrken$enhet_kod, yrken$enhet_namn),
+                           selected = intersect(input$yrken_val, yrken$enhet_kod))
+    })
 
     output$plot_alder_bransch    <- renderGirafe(bransch$alder())
     output$plot_kon_bransch      <- renderGirafe(bransch$kon())

@@ -175,19 +175,23 @@ hamta_oversiktsdata <- function(indelning_kolumn, geografi, ar_val) {
 # tar en riktig kommun_kod: "00" = riket, "20" = hela Dalarnas län,
 # eller en enskild kommunkod -- alla tre är redan färdiga rader i
 # källdatan, inget särfall behövs.
-hamta_matt_totalt <- function(matt_val, geografi, ar_val) {
-  hamta_syss_branscher() |>
-    dplyr::filter(ar == ar_val, matt == matt_val, kommun_kod == geografi) |>
+# branschkoder = NULL ger alla branscher; annars summeras bara dessa
+# SNI-koder (t.ex. från hamta_branschkoder()).
+hamta_matt_totalt <- function(matt_val, geografi, ar_val, branschkoder = NULL) {
+  d <- hamta_syss_branscher() |>
+    dplyr::filter(ar == ar_val, matt == matt_val, kommun_kod == geografi)
+  if (!is.null(branschkoder)) d <- dplyr::filter(d, branschkod %in% branschkoder)
+  d |>
     dplyr::summarise(total = sum(antal, na.rm = TRUE)) |>
     dplyr::pull(total)
 }
 
-hamta_total_sysselsatta <- function(geografi, ar_val) {
-  hamta_matt_totalt("sysselsatta", geografi, ar_val)
+hamta_total_sysselsatta <- function(geografi, ar_val, branschkoder = NULL) {
+  hamta_matt_totalt("sysselsatta", geografi, ar_val, branschkoder)
 }
 
-hamta_total_etablerade <- function(geografi, ar_val) {
-  hamta_matt_totalt("etablerade", geografi, ar_val)
+hamta_total_etablerade <- function(geografi, ar_val, branschkoder = NULL) {
+  hamta_matt_totalt("etablerade", geografi, ar_val, branschkoder)
 }
 
 # --- Sekretess/döljning ---------------------------------------------------

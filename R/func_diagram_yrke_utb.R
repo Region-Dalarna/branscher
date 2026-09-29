@@ -39,7 +39,8 @@ RD_KATEGORISK_2 <- c("#2a78d6", "#eb6834")
 # kategori). kat_ordning = kategoriernas ordning, farger = namngiven
 # vektor (kategori -> färg). sortera_kategori: sortera enheterna efter
 # den sammanlagda andelen i en eller flera kategorier (t.ex. "60-67 år"
-# och "68+ år"); NULL eller tom sorterar efter storlek. markerad = enhet_kod som framhävs (övriga tonas ned).
+# och "68+ år"); NULL eller tom sorterar efter storlek. markerad = en
+# eller flera enhet_kod som framhävs (övriga tonas ned).
 skapa_diagram_fordelning <- function(df, kat_ordning, farger,
                                      markerad = NULL,
                                      sortera_kategori = NULL,
@@ -59,12 +60,13 @@ skapa_diagram_fordelning <- function(df, kat_ordning, farger,
       dplyr::arrange(s)
   }
 
-  markerat <- !is.null(markerad) && nzchar(markerad)
+  markerad <- markerad[nzchar(markerad %||% character(0))]
+  markerat <- length(markerad) > 0
   d <- d |>
     dplyr::mutate(
       enhet_namn = factor(enhet_namn, levels = ordning$enhet_namn),
       kategori  = factor(kategori, levels = rev(kat_ordning)),
-      alfa      = if (markerat) dplyr::if_else(enhet_kod == markerad, 1, 0.45) else 1,
+      alfa      = if (markerat) dplyr::if_else(enhet_kod %in% markerad, 1, 0.45) else 1,
       etikett   = dplyr::if_else(andel >= 0.1, scales::percent(andel, accuracy = 1), ""),
       # Nedtonade rader: mörk text (vit text blir oläslig på blek fyllning).
       etikettfarg = dplyr::if_else(alfa < 1, RD_TEXT, .etikettfarg(farger[as.character(kategori)]))
