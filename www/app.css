@@ -137,3 +137,19 @@
   line-height: 1.35;
   color: var(--rd-text-muted);
 }
+
+/* ---- Nyckeltalskort: siffrorna på samma höjd ----------------------------- */
+/* Korten i en rad är lika höga (grid). Värdet (och ev. rad under) trycks
+   ned i kortets nederkant, så att siffrorna linjerar även när en rubrik
+   bryts över två rader. */
+.rd-kpi { display: flex; flex-direction: column; }
+.rd-kpi__value { margin-top: auto; padding-top: 4px; }
+
+/* i-ikonen i kortets övre högra hörn -- aldrig ensam på en egen rad. */
+.rd-kpi--hjalp .rd-kpi__label { padding-right: 22px; }
+.rd-kpi--hjalp .rd-hjalp {
+  position: absolute;
+  top: 16px;
+  right: 14px;
+  margin-left: 0;
+}
