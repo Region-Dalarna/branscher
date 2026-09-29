@@ -35,8 +35,11 @@ mod_oversikt_ui <- function(id) {
               selectizeInput(ns('bransch_val'), 'Bransch',
                              choices = c('Alla branscher' = ALLA_BRANSCHER),
                              selected = ALLA_BRANSCHER, multiple = TRUE,
-                             options = list(plugins = list('remove_button'),
-                                            placeholder = 'V\u00e4lj bransch\u2026'))),
+                             options = c(list(plugins = list('remove_button'),
+                                              placeholder = 'V\u00e4lj bransch\u2026'),
+                                         SELECTIZE_CTRL_FLERVAL)),
+              div(class = 'rd-hint',
+                  'H\u00e5ll ned Ctrl (\u2318 p\u00e5 Mac) och klicka f\u00f6r att v\u00e4lja flera branscher.')),
 
           div(class = 'rd-info',
               tags$strong('OBS: '),

@@ -45,3 +45,31 @@ yrkesval_ui <- function(ns, placeholder = 'S\u00f6k och l\u00e4gg till yrken\u20
       div(class = 'rd-yrkesval__bara',
           checkboxInput(ns('bara_valda'), 'Visa bara valda yrken', value = FALSE)))
 }
+
+# Selectize-inställningar för en väljare där man oftast vill ha ett val i
+# taget: ett vanligt klick ersätter det som var valt (och stänger listan),
+# Ctrl/⌘ + klick lägger till. Ctrl/⌘-läget läses från musklick och
+# tangenttryck på sidan. Används med multiple = TRUE; en liten text vid
+# väljaren (class rd-hint) talar om hur man väljer flera.
+SELECTIZE_CTRL_FLERVAL <- list(
+  onInitialize = I("function() {
+    if (!window.rdFlervalInit) {
+      window.rdFlervalInit = true;
+      ['mousedown', 'keydown', 'keyup'].forEach(function(typ) {
+        document.addEventListener(typ, function(e) {
+          window.rdFlerval = e.ctrlKey || e.metaKey;
+        }, true);
+      });
+    }
+  }"),
+  onItemAdd = I("function(value) {
+    var self = this;
+    if (window.rdFlerval) return;
+    if (self.items.length <= 1) { self.close(); return; }
+    setTimeout(function() {
+      self.setValue([value]);
+      self.close();
+      self.blur();
+    }, 0);
+  }")
+)
