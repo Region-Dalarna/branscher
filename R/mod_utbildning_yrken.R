@@ -104,8 +104,10 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     )
 
     # ---- Val av yrke/utbildning --------------------------------------------
-    # Listorna är sorterade efter antal sysselsatta (störst först), och
-    # det största yrket/den största utbildningen väljs när urvalet ändras.
+    # Listorna är sorterade efter antal sysselsatta (störst först). När
+    # urvalet ändras ligger valt yrke/vald utbildning kvar om det har minst
+    # MIN_NAMNARE sysselsatta i det nya urvalet; annars väljs det största.
+    # (Byte av utbildningsindelning ger nya koder -> ny utbildning väljs.)
     # Undantag: med Alla branscher är grundskoleutbildning oftast störst
     # och säger lite -- då väljs den näst största utbildningen i stället.
     # Okänt finns kvar i listan men väljs aldrig som förval.
@@ -130,12 +132,20 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       alla_branscher <- !nzchar(urval$bransch())
       grundskola <- function(namn) alla_branscher && grepl('grundskol', namn, ignore.case = TRUE)
 
+      # Behåll nuvarande val om det har tillräckligt underlag i nya urvalet.
+      behall <- function(val, tab, kod_kol, standard) {
+        giltiga <- tab[[kod_kol]][tab$n >= MIN_NAMNARE]
+        if (isTRUE(val %in% giltiga)) val else standard
+      }
+
       updateSelectizeInput(session, 'yrke_val',
                            choices  = stats::setNames(yrken$yrke_kod, yrken$yrke_namn),
-                           selected = forval(yrken$yrke_kod, yrken$yrke_namn))
+                           selected = behall(input$yrke_val, yrken, 'yrke_kod',
+                                             forval(yrken$yrke_kod, yrken$yrke_namn)))
       updateSelectizeInput(session, 'utb_val',
                            choices  = stats::setNames(utb$utb_kod, utb$utb_namn),
-                           selected = forval(utb$utb_kod, utb$utb_namn, hoppa_over = grundskola))
+                           selected = behall(input$utb_val, utb, 'utb_kod',
+                                             forval(utb$utb_kod, utb$utb_namn, hoppa_over = grundskola)))
     })
 
     # Klick på en ruta väljer den i den andra mosaiken ("övr" = Övriga).
