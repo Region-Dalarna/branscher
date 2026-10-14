@@ -202,6 +202,22 @@ hamta_bransch_profil <- function(ar_val, geografi, indelning_kolumn, kat_kolumne
     dplyr::summarise(antal = sum(antal), .groups = "drop")
 }
 
+# Enheter (yrken) rangordnade efter andel i en eller flera kategorier,
+# bland enheter med minst MIN_NAMNARE i underlaget. riktning = "hogst"
+# eller "lagst". Okänt yrke tas inte med. Returnerar enhet_kod i ordning.
+rangordna_enheter <- function(profil, kat_kol, kategorier, riktning = c("hogst", "lagst")) {
+  riktning <- match.arg(riktning)
+  r <- profil |>
+    dplyr::filter(!enhet_kod %in% c("***", "saknas")) |>
+    dplyr::group_by(enhet_kod) |>
+    dplyr::summarise(total = sum(antal),
+                     andel = sum(antal[.data[[kat_kol]] %in% kategorier]) / total) |>
+    dplyr::filter(total >= MIN_NAMNARE)
+  r <- if (riktning == "hogst") dplyr::arrange(r, dplyr::desc(andel), dplyr::desc(total))
+       else dplyr::arrange(r, andel, dplyr::desc(total))
+  r$enhet_kod
+}
+
 # Antal valda enheter som inte kan visas: saknas i profilen eller har
 # färre än MIN_NAMNARE sysselsatta.
 antal_for_sma <- function(profil, valda) {

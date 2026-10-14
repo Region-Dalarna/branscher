@@ -57,10 +57,19 @@ mod_matchning_ui <- function(id) {
                      div(class = 'rd-card',
                          h2('Matchning per yrke'),
                          div(class = 'rd-subtitle',
-                             'De 20 största yrkena i urvalet. Yrken du lägger till nedan framhävs ',
-                             'och ersätter de minsta \u2013 eller visas ensamma med \u201cVisa bara valda yrken\u201d. ',
                              'Andel helt, delvis och inte matchade bland de anställda där ',
-                             'matchningen kan bedömas.'),
+                             'matchningen kan bedömas. Välj vilka 20 yrken som visas; yrken du ',
+                             'lägger till nedan framhävs och ersätter de sista \u2013 eller visas ',
+                             'ensamma med \u201cVisa bara valda yrken\u201d. Högst/lägst andel räknas bland ',
+                             'yrken med minst ', MIN_NAMNARE, ' anställda med bedömd matchning.'),
+                         div(class = 'rd-sortering',
+                             span(class = 'rd-sortering__label', 'Visa:'),
+                             shinyWidgets::radioGroupButtons(
+                               ns('yrken_urval'), label = NULL, individual = TRUE, size = 'sm',
+                               choices = c('20 största' = 'storsta',
+                                           'Högst andel helt matchade' = 'hogst',
+                                           'Lägst andel helt matchade' = 'lagst'),
+                               selected = 'storsta')),
                          yrkesval_ui(ns),
                          girafeOutput(ns('plot_matchning_yrke'), height = 'auto')))
           ),
@@ -139,11 +148,25 @@ mod_matchning_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       if (bara && length(valda) == 0) {
         return(.girafe_std(.tom_plot('L\u00e4gg till yrken i s\u00f6krutan ovan'), height_svg = 1.5))
       }
-      notis <- notis_for_sma(
-        antal_for_sma(dplyr::filter(profil(), gruppering %in% MATCHNING_GRUPPER), valda),
-        'anställda med bedömd matchning')
-      matchning_per_enhet(profil(), if (bara) 0 else 20, if (bara) NULL else valda,
-                          paste0(urval$underrubrik(), notis), enheter = valda)
+      bedomda <- dplyr::filter(profil(), gruppering %in% MATCHNING_GRUPPER)
+      notis <- notis_for_sma(antal_for_sma(bedomda, valda), 'anställda med bedömd matchning')
+
+      # Vilka 20 som visas: de största, eller högst/lägst andel helt
+      # matchade bland alla yrken i urvalet. Valda yrken läggs till först.
+      urval_val <- input$yrken_urval %||% 'storsta'
+      if (bara || urval_val == 'storsta') {
+        n <- if (bara) 0 else 20
+        enheter <- valda
+        urval_txt <- if (bara) 'valda yrken' else '20 största yrkena'
+      } else {
+        rang <- rangordna_enheter(bedomda, 'gruppering', 'Helt matchade', urval_val)
+        enheter <- unique(c(valda, utils::head(setdiff(rang, valda), max(0, 20 - length(valda)))))
+        n <- 0
+        urval_txt <- paste('20 yrken med', if (urval_val == 'hogst') 'högst' else 'lägst',
+                           'andel helt matchade')
+      }
+      matchning_per_enhet(profil(), n, if (bara) NULL else valda,
+                          paste0(urval$underrubrik(), ' · ', urval_txt, notis), enheter = enheter)
     })
 
     utan_uppgifter <- shiny::reactive(

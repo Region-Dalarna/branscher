@@ -101,7 +101,9 @@ skapa_diagram_fordelning <- function(df, kat_ordning, farger,
     ggplot2::scale_fill_manual(values = farger, breaks = kat_ordning, name = NULL,
                                drop = TRUE) +
     ggplot2::scale_color_identity() +
-    ggplot2::scale_y_discrete(labels = etiketter) +
+    # limits låser ordningen: annars hamnar markerade rader (randlagret,
+    # som ritas först) först på axeln, dvs. längst ned.
+    ggplot2::scale_y_discrete(limits = levels(d$enhet_namn), labels = etiketter) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),
                                 expand = ggplot2::expansion(mult = c(0, 0.01))) +
     ggplot2::labs(x = NULL, y = NULL,
