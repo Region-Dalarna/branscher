@@ -7,5 +7,6 @@ shinyServer(function(input, output, session) {
                               aktiv = reactive(input$flik == 'Utbildning & yrken'))
   mod_matchning_server('matchning', aktiv = reactive(input$flik == 'Matchning'))
   mod_demografi_server('demografi', aktiv = reactive(input$flik == 'Demografi'))
+  mod_prognos_server('prognos', aktiv = reactive(input$flik == 'Prognos'))
 
 })

@@ -153,3 +153,17 @@
   right: 14px;
   margin-left: 0;
 }
+
+/* ---- Prognos: SCB:s fotnoter (utfällbar ruta) ---------------------------- */
+.rd-fotnoter summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--rd-primary-dark, #0f7090);
+}
+.rd-fotnoter h4 { font-size: 0.9rem; font-weight: 600; margin: 14px 0 4px; }
+.rd-fotnot {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--rd-text-muted);
+  white-space: pre-wrap;
+}

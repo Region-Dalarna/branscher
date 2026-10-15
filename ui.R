@@ -35,18 +35,35 @@ shinyUI(
         tabPanel('Demografi',               mod_demografi_ui('demografi')),
         tabPanel('Behov & rekrytering',     mod_flik_placeholder_ui('behov',           'Behov & rekrytering')),
         tabPanel('Rörlighet & hälsa',       mod_flik_placeholder_ui('rorlighet_halsa', 'Rörlighet & hälsa')),
-        tabPanel('Prognos',                 mod_flik_placeholder_ui('prognos',         'Prognos')),
+        tabPanel('Prognos',                 mod_prognos_ui('prognos')),
 
         tabPanel(
           'Om rapporten',
           div(class = 'rd-card',
               h2('Om rapporten'),
               p('Den här applikationen visar branschstatistik för Dalarna, ',
-                'utifrån inspel från branschorganisationerna. I nuvarande ',
-                'version är Översikt inlagd; övriga flikar tillkommer efter hand.'),
+                'utifrån inspel från branschorganisationerna. Flikarna ',
+                'Behov & rekrytering och Rörlighet & hälsa tillkommer efter hand.'),
+              h3('Flikar och källor'),
+              tags$ul(
+                tags$li(tags$strong('Översikt: '),
+                        'sysselsatta och etablerade per bransch i Dalarnas kommuner, länet och riket. ',
+                        'Källa: SCB (RAMS).'),
+                tags$li(tags$strong('Utbildning & yrken, Matchning, Demografi: '),
+                        'sysselsatta efter yrke, utbildning, matchning, ålder, kön och bakgrund. ',
+                        'Källa: SCB (Yrkesregistret, Utbildningsregistret).'),
+                tags$li(tags$strong('Prognos: '),
+                        'förvärvsarbetande per näringsgren och arbetskraften 2023–2040, Dalarnas län ',
+                        'och riket. Källa: SCB, Regionala trender och prognoser 2025 (RegTop), ',
+                        'publicerad 2026-05-25. RegTop använder egna näringsgrenar och finns bara ',
+                        'för län och riket.')
+              ),
               div(class = 'rd-info',
-                  tags$strong('Källa: '),
-                  'SCB (RAMS) m.fl., bearbetat av Region Dalarna.')
+                  tags$strong('Sekretess: '),
+                  'Antal under 4 visas som “färre än 4”. Andelar för yrken, utbildningar ',
+                  'och branscher visas bara när underlaget är minst 20 sysselsatta.'),
+              p(class = 'rd-subtitle', style = 'margin-top: 12px;',
+                'Bearbetning: Samhällsanalys, Region Dalarna.')
           )
         )
       )

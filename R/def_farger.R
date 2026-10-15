@@ -23,3 +23,8 @@ RD_TOOLTIP_CSS <- paste0(
 )
 RD_HOVER_CSS  <- paste0("stroke:", RD_PRIMARY_DARK, ";stroke-width:1.5px;")
 RD_SELECT_CSS <- paste0("stroke:", RD_PRIMARY, ";stroke-width:2px;fill-opacity:1;")
+
+# Kategorisk palett (fast ordning, validerad för färgblindhet på
+# angränsande par). Används för t.ex. näringsgrenar i linjediagram; max
+# sex serier åt gången.
+RD_KATEGORISK <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300")

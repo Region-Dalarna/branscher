@@ -35,4 +35,7 @@ source("https://raw.githubusercontent.com/Region-Dalarna/funktioner/main/func_sh
 #   R/mod_utbildning_yrken.R    modul: flik Utbildning & yrken
 #   R/mod_matchning.R           modul: flik Matchning
 #   R/mod_demografi.R           modul: flik Demografi
+#   R/mod_prognos.R             modul: flik Prognos (RegTop2025)
+#   R/func_data_regtop.R        dataåtkomst RegTop (schema regtop)
+#   R/func_diagram_regtop.R     diagram för flik Prognos
 #   R/mod_flik_placeholder.R    platshållarmodul för flikar som inte är byggda än
