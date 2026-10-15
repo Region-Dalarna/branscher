@@ -40,5 +40,6 @@ BEDOMNING_FARGER <- c(
   "Visst överskott"  = "#8fc3d8",
   "Överskott"        = "#3f93b8",
   "Stort överskott"  = "#0f5f86",
-  "Prognos saknas"        = "#ececea"
+  "Prognos saknas"        = "#ececea",
+  "Ing\u00e5r inte i bed\u00f6mningen" = "#f8f8f6"
 )

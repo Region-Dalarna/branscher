@@ -166,10 +166,11 @@ hamta_yrken_lan <- function() {
     dplyr::arrange(dplyr::desc(antal))
 }
 
-# Andel av varje yrkes förvärvsarbetande per bedömning (brist/balans/...).
+# Andel av varje yrkes förvärvsarbetande per bedömning (brist/balans/...),
+# med enhet_kod/enhet som i bransch_andel_per_bedomning().
 yrke_andel_per_bedomning <- function(yub) {
   yub |>
-    dplyr::group_by(yrke_kod, yrke, bedomning, .drop = FALSE) |>
+    dplyr::group_by(enhet_kod = yrke_kod, enhet = yrke, bedomning, .drop = FALSE) |>
     dplyr::summarise(andel = sum(andel), .groups = "drop")
 }
 
@@ -184,4 +185,64 @@ regtop_yrke_for_ssyk3 <- function(ssyk3, yrken_lan) {
     unique()
   traff <- yrken_lan$yrke_kod[yrken_lan$yrke_kod %in% grupper]
   if (length(traff) == 0) NULL else traff[1]  # yrken_lan är sorterad efter storlek
+}
+
+# ---- Bedömning för branscher (mikrodata + RegTop) -----------------------------
+# Mikrodatans utbildningsgrupp (sun2020grp_t23 i utb_yrken_branscher)
+# kopplas till RegTop:s utbildningsgrupper (sun2020grp_alt_reg, samma koder
+# som i bedomning_2040) via regtop.nyckel_utbildningsgrupper.
+
+BEDOMNING_INGAR_INTE <- "Ingår inte i bedömningen"
+BEDOMNING_NIVAER <- c(REGTOP_BEDOMNINGAR, BEDOMNING_SAKNAS, BEDOMNING_INGAR_INTE)
+
+hamta_nyckel_utbildningsgrupper <- function() {
+  .regtop_hamta("nyckel_utbildningsgrupper", region = FALSE) |>
+    dplyr::distinct(sun2020grp_t23, sun2020grp_alt_reg, kortnamn_alt_reg)
+}
+
+# Sysselsatta per bransch (grupp i vald indelning) och RegTop-
+# utbildningsgrupp i vald geografi och år, med SCB:s bedömning 2040 för
+# Dalarnas län. Alla branscher i indelningen. Kolumner: bransch,
+# utbildningsgrupp_kod, utbildningsgrupp, bedomning, balanstal, antal.
+hamta_bransch_utbildning_bedomning <- function(ar_val, geografi, indelning_kolumn) {
+  dim_br <- hamta_dim_bransch() |>
+    dplyr::select(branschkod, bransch = dplyr::all_of(indelning_kolumn)) |>
+    dplyr::filter(!is.na(bransch), bransch != "")
+  bed <- hamta_bedomning_lan()
+
+  hamta_yrke_utb(ar_val, geografi, c("branschkod", "sun2020grp_t23")) |>
+    dplyr::mutate(branschkod = sprintf("%02d", as.integer(branschkod)),
+                  sun2020grp_t23 = as.character(sun2020grp_t23)) |>
+    dplyr::inner_join(dim_br, by = "branschkod") |>
+    dplyr::left_join(hamta_nyckel_utbildningsgrupper(), by = "sun2020grp_t23") |>
+    dplyr::left_join(bed, by = c("sun2020grp_alt_reg" = "utbildningsgrupp_kod")) |>
+    dplyr::mutate(
+      utbildningsgrupp_kod = dplyr::coalesce(sun2020grp_alt_reg, "saknas"),
+      utbildningsgrupp = dplyr::coalesce(kortnamn_alt_reg, "Uppgift saknas"),
+      bedomning = factor(dplyr::coalesce(bedomning, BEDOMNING_INGAR_INTE), levels = BEDOMNING_NIVAER)
+    ) |>
+    dplyr::group_by(bransch, utbildningsgrupp_kod, utbildningsgrupp, bedomning, balanstal) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop")
+}
+
+# Andelar för ett urval branscher (NULL = alla): per utbildningsgrupp
+# (andel av sysselsatta) -- samma kolumner som skapa_diagram_utbildningar()
+# vill ha.
+bransch_utbildningar <- function(bub, branscher = NULL) {
+  d <- if (length(branscher) > 0) dplyr::filter(bub, bransch %in% branscher) else bub
+  d |>
+    dplyr::group_by(utbildningsgrupp_kod, utbildningsgrupp, bedomning, balanstal) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop") |>
+    dplyr::mutate(andel = antal / sum(antal))
+}
+
+# Andel av varje branschs sysselsatta per bedömning (för topplistan).
+bransch_andel_per_bedomning <- function(bub) {
+  bub |>
+    dplyr::group_by(enhet = bransch, bedomning, .drop = FALSE) |>
+    dplyr::summarise(n = sum(antal), .groups = "drop") |>
+    dplyr::group_by(enhet) |>
+    dplyr::mutate(antal = sum(n), andel = dplyr::if_else(antal > 0, n / antal, 0)) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(enhet_kod = enhet, enhet, antal, bedomning, andel)
 }

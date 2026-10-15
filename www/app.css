@@ -167,3 +167,8 @@
   color: var(--rd-text-muted);
   white-space: pre-wrap;
 }
+
+/* Innehåll direkt under en underflik (Behov & rekrytering). */
+.rd-underflik-kpi,
+.rd-underflik-kort { margin-top: 16px; }
+.rd-underflik-kpi { margin-bottom: 16px; }

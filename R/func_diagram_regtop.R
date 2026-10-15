@@ -176,19 +176,20 @@ skapa_diagram_arbetskraft_pyramid <- function(d, basar, ar_val, underrubrik = NU
   }
 }
 
-# Utbildningar som ett yrke rekryterar från: andel av yrkets
-# förvärvsarbetande per utbildningsgrupp (de topp_n största), färgade
-# efter SCB:s bedömning 2040 i länet. d = hamta_yrke_utbildning_bedomning()
-# filtrerad på ett yrke.
-skapa_diagram_yrke_utbildningar <- function(d, topp_n = 15, underrubrik = NULL, kalla = NULL) {
+# Utbildningar i en bransch (eller ett yrke): andel per utbildningsgrupp
+# (de topp_n största), färgade efter SCB:s bedömning 2040 i länet.
+# d: utbildningsgrupp_kod, utbildningsgrupp, andel (0-1), bedomning,
+# balanstal. andel_txt = tooltipens text för andelen.
+skapa_diagram_utbildningar <- function(d, topp_n = 15, andel_txt = "Andel",
+                                       underrubrik = NULL, kalla = NULL) {
   if (nrow(d) == 0) {
-    return(.girafe_std(.tom_plot("Ingen utbildningsstruktur för yrket"), height_svg = 1.5))
+    return(.girafe_std(.tom_plot("Ingen utbildningsstruktur att visa"), height_svg = 1.5))
   }
   dd <- d |>
     dplyr::slice_max(andel, n = topp_n, with_ties = FALSE) |>
     dplyr::mutate(
       utbildningsgrupp = factor(utbildningsgrupp, levels = rev(utbildningsgrupp)),
-      tooltip = paste0("<b>", utbildningsgrupp, "</b><br/>Andel av yrket: ", .pct(andel, plus = FALSE),
+      tooltip = paste0("<b>", utbildningsgrupp, "</b><br/>", andel_txt, ": ", .pct(andel, plus = FALSE),
                        "<br/>Bedömning 2040: ", bedomning,
                        dplyr::if_else(is.na(balanstal), "",
                                       paste0("<br/>Balanstal: ",
@@ -221,43 +222,45 @@ skapa_diagram_yrke_utbildningar <- function(d, topp_n = 15, underrubrik = NULL, 
   .girafe_std(g, width_svg = 10, height_svg = nrow(dd) * 0.36 + 2.2)
 }
 
-# Yrken mest beroende av bristutbildningar: andel av yrkets
-# förvärvsarbetande med utbildning som bedöms bli stor brist/brist/viss
-# brist 2040, staplat per grad. d: yrke_kod, yrke, antal, bedomning,
-# andel (bara bristgraderna). markerad = yrke_kod som framhävs (rand +
-# fet etikett) och alltid tas med. Klick på ett yrke väljer det.
+# Branscher eller yrken mest beroende av bristutbildningar: andel med
+# utbildning som bedöms bli stor brist/brist/viss brist 2040, staplat per
+# grad. d: enhet_kod, enhet, antal, bedomning, andel (bara bristgraderna).
+# markerad = enhet_kod som framhävs (rand + fet etikett) och alltid tas
+# med. antal_txt: "förvärvsarbetande"/"sysselsatta". klickbar = TRUE ger
+# input <id>_selected med enhet_kod.
 skapa_diagram_bristberoende <- function(d, markerad = NULL, topp_n = 20,
-                                        underrubrik = NULL, kalla = NULL) {
+                                        antal_txt = "f\u00f6rv\u00e4rvsarbetande",
+                                        klickbar = TRUE, underrubrik = NULL, kalla = NULL) {
   summa <- d |>
-    dplyr::group_by(yrke_kod, yrke, antal) |>
+    dplyr::group_by(enhet_kod, enhet, antal) |>
     dplyr::summarise(brist = sum(andel), .groups = "drop") |>
     dplyr::arrange(dplyr::desc(brist))
-  valda <- unique(c(utils::head(summa$yrke_kod, topp_n), markerad))
-  summa <- dplyr::filter(summa, yrke_kod %in% valda)
+  valda <- unique(c(utils::head(summa$enhet_kod, topp_n), markerad))
+  summa <- dplyr::filter(summa, enhet_kod %in% valda)
   if (nrow(summa) == 0) {
     return(.girafe_std(.tom_plot("Inga yrken att visa"), height_svg = 1.5))
   }
 
-  niv <- rev(summa$yrke)  # störst andel överst
+  niv <- rev(summa$enhet)  # störst andel överst
   dd <- d |>
-    dplyr::filter(yrke_kod %in% valda) |>
-    dplyr::left_join(dplyr::select(summa, yrke_kod, brist), by = "yrke_kod") |>
+    dplyr::filter(enhet_kod %in% valda) |>
+    dplyr::left_join(dplyr::select(summa, enhet_kod, brist), by = "enhet_kod") |>
     dplyr::mutate(
-      yrke = factor(yrke, levels = niv),
+      enhet = factor(enhet, levels = niv),
       bedomning = factor(as.character(bedomning), levels = rev(BEDOMNING_BRIST)),
-      tooltip = paste0("<b>", yrke, "</b><br/>", .tal(antal), " förvärvsarbetande<br/>",
+      tooltip = paste0("<b>", enhet, "</b><br/>", .tal(antal), " ", antal_txt, "<br/>",
                        "Med bristutbildning: ", .pct(brist, plus = FALSE), "<br/>",
                        bedomning, ": ", .pct(andel, plus = FALSE))
     )
-  rand <- summa |> dplyr::filter(yrke_kod %in% markerad) |> dplyr::pull(yrke)
+  rand <- summa |> dplyr::filter(enhet_kod %in% markerad) |> dplyr::pull(enhet)
 
-  g <- ggplot2::ggplot(dd, ggplot2::aes(x = andel, y = yrke)) +
-    ggplot2::geom_tile(data = data.frame(yrke = factor(rand, levels = niv)),
-                       ggplot2::aes(x = max(summa$brist) * 0.52, y = yrke),
+  g <- ggplot2::ggplot(dd, ggplot2::aes(x = andel, y = enhet)) +
+    ggplot2::geom_tile(data = data.frame(enhet = factor(rand, levels = niv)),
+                       ggplot2::aes(x = max(summa$brist) * 0.52, y = enhet),
                        width = max(summa$brist) * 1.04, height = 0.96, fill = "#d6ebf2",
                        inherit.aes = FALSE) +
     ggiraph::geom_col_interactive(
-      ggplot2::aes(fill = bedomning, tooltip = tooltip, data_id = yrke_kod),
+      ggplot2::aes(fill = bedomning, tooltip = tooltip, data_id = enhet_kod),
       width = 0.72, color = "white", linewidth = 0.4
     ) +
     ggplot2::scale_fill_manual(values = BEDOMNING_FARGER[BEDOMNING_BRIST], breaks = BEDOMNING_BRIST,
@@ -265,7 +268,7 @@ skapa_diagram_bristberoende <- function(d, markerad = NULL, topp_n = 20,
     ggplot2::scale_y_discrete(limits = niv, labels = .etiketter_md(rand)) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),
                                 expand = ggplot2::expansion(mult = c(0, 0.04))) +
-    ggplot2::labs(x = "Andel av yrkets förvärvsarbetande med bristutbildning", y = NULL,
+    ggplot2::labs(x = paste("Andel av de", antal_txt, "med bristutbildning"), y = NULL,
                   subtitle = underrubrik, caption = .kalltext(kalla)) +
     .rd_tema() +
     ggplot2::theme(legend.position = "top", legend.justification = "left",
@@ -273,5 +276,5 @@ skapa_diagram_bristberoende <- function(d, markerad = NULL, topp_n = 20,
                    axis.text.y.left = ggtext::element_markdown(hjust = 1, halign = 1, lineheight = 1.1,
                                                                margin = ggplot2::margin(r = 4)))
 
-  .girafe_std(g, width_svg = 10, height_svg = nrow(summa) * 0.36 + 2.2, selection = TRUE)
+  .girafe_std(g, width_svg = 10, height_svg = nrow(summa) * 0.36 + 2.2, selection = klickbar)
 }
