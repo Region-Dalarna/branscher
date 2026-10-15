@@ -26,14 +26,17 @@ REGTOP_NARINGSGREN_SAKNAS <- "24"
 
 .regtop_cache <- new.env(parent = emptyenv())
 
-.regtop_hamta <- function(tabell, force = FALSE) {
+# region = FALSE för tabeller utan regionkod (nyckeltabeller).
+.regtop_hamta <- function(tabell, force = FALSE, region = TRUE) {
   if (force || is.null(.regtop_cache[[tabell]])) {
     con <- shiny_uppkoppling_las("oppna_data")
     on.exit(DBI::dbDisconnect(con))
-    .regtop_cache[[tabell]] <- dplyr::tbl(con, dbplyr::in_schema("regtop", tabell)) |>
-      dplyr::filter(regionkod %in% !!REGTOP_REGIONER) |>
-      dplyr::collect() |>
-      dplyr::mutate(ar = as.integer(ar), varde = as.numeric(varde))
+    q <- dplyr::tbl(con, dbplyr::in_schema("regtop", tabell))
+    if (region) q <- dplyr::filter(q, regionkod %in% !!REGTOP_REGIONER)
+    d <- dplyr::collect(q)
+    if ("ar" %in% names(d))    d$ar    <- as.integer(d$ar)
+    if ("varde" %in% names(d)) d$varde <- as.numeric(d$varde)
+    .regtop_cache[[tabell]] <- d
   }
   .regtop_cache[[tabell]]
 }
@@ -106,4 +109,79 @@ storsta_naringsgrenar <- function(d, basar, n = 3) {
     dplyr::arrange(dplyr::desc(varde)) |>
     utils::head(n) |>
     dplyr::pull(naringsgren_kod)
+}
+
+# ---- Behov & rekrytering --------------------------------------------------------
+
+# SCB:s bedömning av arbetsmarknadsläget 2040, i ordning från störst brist.
+# Samma kategorier och färger som Utbildning-appen (def_farger.R där:
+# REGTOP_BEDOMNINGAR/BEDOMNING_FARGER) -- håll dem i synk.
+REGTOP_BEDOMNINGAR <- c("Stor brist", "Brist", "Viss brist", "Balans",
+                        "Visst \u00f6verskott", "\u00d6verskott", "Stort \u00f6verskott")
+BEDOMNING_SAKNAS   <- "Prognos saknas"
+BEDOMNING_BRIST    <- REGTOP_BEDOMNINGAR[1:3]
+BEDOMNING_OVERSKOTT <- REGTOP_BEDOMNINGAR[5:7]
+
+# Yrken (RegTop:s yrkesgrupper, 5 siffror) med färre förvärvsarbetande i
+# länet än så här tas inte med i topplistan över bristberoende yrken.
+BEHOV_MIN_YRKE <- 200
+
+# Yrkesgrupper som betyder att yrke saknas.
+REGTOP_YRKE_SAKNAS <- c("99998", "99999")
+
+# Bedömning 2040 per utbildningsgrupp i länet. Grupper utan framskrivning
+# får "Prognos saknas".
+hamta_bedomning_lan <- function() {
+  .regtop_hamta("bedomning_2040") |>
+    dplyr::filter(regionkod == REGTOP_LAN) |>
+    dplyr::transmute(
+      utbildningsgrupp_kod,
+      bedomning = dplyr::if_else(framskrivning_2040 %in% "Ja" &
+                                   bedomning_2040 %in% REGTOP_BEDOMNINGAR,
+                                 bedomning_2040, BEDOMNING_SAKNAS),
+      balanstal = as.numeric(balanstal_procent)
+    )
+}
+
+# Utbildningsstruktur per yrke i länet 2023 (andel 0-1 av yrkets
+# förvärvsarbetande per utbildningsgrupp), med bedömning 2040.
+hamta_yrke_utbildning_bedomning <- function() {
+  .regtop_hamta("yrke_utbildning_andel") |>
+    dplyr::filter(regionkod == REGTOP_LAN, andel_av == "yrke") |>
+    dplyr::transmute(yrke_kod, yrke, utbildningsgrupp_kod, utbildningsgrupp,
+                     andel = varde / 100) |>
+    dplyr::left_join(hamta_bedomning_lan(), by = "utbildningsgrupp_kod") |>
+    dplyr::mutate(bedomning = dplyr::coalesce(bedomning, BEDOMNING_SAKNAS),
+                  bedomning = factor(bedomning, levels = c(REGTOP_BEDOMNINGAR, BEDOMNING_SAKNAS)))
+}
+
+# Förvärvsarbetande per yrkesgrupp i länet 2023 (yrkesstruktur), utan
+# "yrke saknas".
+hamta_yrken_lan <- function() {
+  .regtop_hamta("yrkesstruktur") |>
+    dplyr::filter(regionkod == REGTOP_LAN, enhet == "antal",
+                  !yrke_kod %in% REGTOP_YRKE_SAKNAS) |>
+    dplyr::group_by(yrke_kod, yrke) |>
+    dplyr::summarise(antal = sum(varde), .groups = "drop") |>
+    dplyr::arrange(dplyr::desc(antal))
+}
+
+# Andel av varje yrkes förvärvsarbetande per bedömning (brist/balans/...).
+yrke_andel_per_bedomning <- function(yub) {
+  yub |>
+    dplyr::group_by(yrke_kod, yrke, bedomning, .drop = FALSE) |>
+    dplyr::summarise(andel = sum(andel), .groups = "drop")
+}
+
+# RegTop-yrkesgrupp som motsvarar en SSYK 2012-kod på tresiffernivå
+# (från mikrodatan i Utbildning & yrken), via nyckel_yrkesgrupper
+# (SSYK fyrsiffrig). Flera träffar -> den största i länet. NULL om ingen.
+regtop_yrke_for_ssyk3 <- function(ssyk3, yrken_lan) {
+  if (is.null(ssyk3) || !nzchar(ssyk3)) return(NULL)
+  grupper <- .regtop_hamta("nyckel_yrkesgrupper", region = FALSE) |>
+    dplyr::filter(substr(as.character(yrke_kod), 1, 3) == ssyk3) |>
+    dplyr::pull(yrkesgrupp_kod) |>
+    unique()
+  traff <- yrken_lan$yrke_kod[yrken_lan$yrke_kod %in% grupper]
+  if (length(traff) == 0) NULL else traff[1]  # yrken_lan är sorterad efter storlek
 }

@@ -85,6 +85,7 @@ mod_utbildning_yrken_ui <- function(id) {
 }
 
 # aktiv: reaktiv som är TRUE när fliken visas (se mod_urval_yrke.R).
+# Returnerar list(yrke = reaktiv med valt yrke).
 mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
   moduleServer(id, function(input, output, session) {
 
@@ -210,5 +211,8 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     output$plot_utb_yrke   <- renderGirafe(mosaik(utb_yrke()))
     output$tabell_yrke_utb <- renderUI(tabell(yrke_utb(), 'Utbildning'))
     output$tabell_utb_yrke <- renderUI(tabell(utb_yrke(), 'Yrke'))
+
+    # Valt yrke (SSYK 2012, tresiffrig) -- används av Behov & rekrytering.
+    list(yrke = shiny::reactive(input$yrke_val))
   })
 }

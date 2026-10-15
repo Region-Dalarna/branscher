@@ -28,3 +28,17 @@ RD_SELECT_CSS <- paste0("stroke:", RD_PRIMARY, ";stroke-width:2px;fill-opacity:1
 # angränsande par). Används för t.ex. näringsgrenar i linjediagram; max
 # sex serier åt gången.
 RD_KATEGORISK <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300")
+
+# SCB:s bedömning av arbetsmarknadsläget 2040 (RegTop): rödbrun = brist,
+# grå = balans, blå = överskott. Samma värden som BEDOMNING_FARGER i
+# Utbildning-appens def_farger.R -- håll dem i synk. "Prognos saknas" ljusgrå.
+BEDOMNING_FARGER <- c(
+  "Stor brist"            = "#a6361c",
+  "Brist"                 = "#d9653b",
+  "Viss brist"            = "#f0a875",
+  "Balans"                = "#c9d1d6",
+  "Visst överskott"  = "#8fc3d8",
+  "Överskott"        = "#3f93b8",
+  "Stort överskott"  = "#0f5f86",
+  "Prognos saknas"        = "#ececea"
+)
