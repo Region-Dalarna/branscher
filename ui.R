@@ -85,9 +85,9 @@ shinyUI(
                         'Källa: SCB (Yrkesregistret, Utbildningsregistret).'),
                 tags$li(tags$strong('Prognos: '),
                         'förvärvsarbetande per näringsgren och arbetskraften 2023–2040, Dalarnas län ',
-                        'och riket. Källa: SCB, Regionala trender och prognoser 2025 (RegTop), ',
-                        'publicerad 2026-05-25. RegTop använder egna näringsgrenar och finns bara ',
-                        'för län och riket.')
+                        'och riket. Källa: SCB, Regionala trender och prognoser 2025, ',
+                        'publicerad 2026-05-25. Prognosen använder egna näringsgrenar och finns ',
+                        'bara för län och riket.')
               ),
               div(class = 'rd-info',
                   tags$strong('Sekretess: '),

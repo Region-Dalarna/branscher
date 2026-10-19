@@ -33,7 +33,7 @@ mod_prognos_ui <- function(id) {
                                             placeholder = 'Välj näringsgrenar…'))),
           div(class = 'rd-info',
               tags$strong('Om prognosen: '),
-              'SCB:s Regionala trender och prognoser 2025 (RegTop). Finns bara för ',
+              'SCB:s Regionala trender och prognoser 2025. Finns bara för ',
               'län och riket, och med SCB:s egna 24 näringsgrenar – därför har ',
               'fliken egna val och följer inte geografin och branschindelningen i ',
               'övriga flikar.')

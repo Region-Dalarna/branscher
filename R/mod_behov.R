@@ -29,7 +29,7 @@ mod_behov_ui <- function(id) {
         ns('urval'),
         div(class = 'rd-info',
             tags$strong('Om bedömningen: '),
-            'SCB:s Regionala trender och prognoser 2025 (RegTop) bedömer ',
+            'SCB:s Regionala trender och prognoser 2025 bedömer ',
             'arbetsmarknadsläget 2040 för utbildningsgrupper i Dalarnas län – ',
             'från stor brist till stort överskott. Bedömningen gäller länet även ',
             'när en kommun är vald.')

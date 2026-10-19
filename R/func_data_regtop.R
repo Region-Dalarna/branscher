@@ -18,7 +18,7 @@
 
 REGTOP_REGIONER <- c("00", "20")
 REGTOP_LAN      <- "20"
-REGTOP_KALLA    <- "SCB, Regionala trender och prognoser 2025 (RegTop), bearbetat av Region Dalarna"
+REGTOP_KALLA    <- "SCB, Regionala trender och prognoser 2025, bearbetat av Region Dalarna"
 
 # RegTop:s grupp 24 "Uppgift saknas" -- med i totaler, inte i diagram
 # per näringsgren.
