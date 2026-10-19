@@ -189,6 +189,7 @@
   z-index: 1000;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   padding-top: 72px;
   pointer-events: none;
   opacity: 1;
