@@ -172,3 +172,10 @@
 .rd-underflik-kpi,
 .rd-underflik-kort { margin-top: 16px; }
 .rd-underflik-kpi { margin-bottom: 16px; }
+
+/* Flikar: ingen fokusram vid musklick, men kvar vid tangentbordsnavigering. */
+.nav-tabs > li > a:focus:not(:focus-visible),
+.nav-tabs .nav-link:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}

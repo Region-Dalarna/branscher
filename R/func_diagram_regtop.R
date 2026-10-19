@@ -177,10 +177,10 @@ skapa_diagram_arbetskraft_pyramid <- function(d, basar, ar_val, underrubrik = NU
 }
 
 # Utbildningar i en bransch (eller ett yrke): andel per utbildningsgrupp
-# (de topp_n största), färgade efter SCB:s bedömning 2040 i länet.
+# (de topp_n största + Övriga), färgade efter SCB:s bedömning 2040 i länet.
 # d: utbildningsgrupp_kod, utbildningsgrupp, andel (0-1), bedomning,
 # balanstal. andel_txt = tooltipens text för andelen.
-skapa_diagram_utbildningar <- function(d, topp_n = 15, andel_txt = "Andel",
+skapa_diagram_utbildningar <- function(d, topp_n = 20, andel_txt = "Andel",
                                        underrubrik = NULL, kalla = NULL) {
   if (nrow(d) == 0) {
     return(.girafe_std(.tom_plot("Ingen utbildningsstruktur att visa"), height_svg = 1.5))
@@ -188,38 +188,50 @@ skapa_diagram_utbildningar <- function(d, topp_n = 15, andel_txt = "Andel",
   dd <- d |>
     dplyr::slice_max(andel, n = topp_n, with_ties = FALSE) |>
     dplyr::mutate(
-      utbildningsgrupp = factor(utbildningsgrupp, levels = rev(utbildningsgrupp)),
       tooltip = paste0("<b>", utbildningsgrupp, "</b><br/>", andel_txt, ": ", .pct(andel, plus = FALSE),
-                       "<br/>Bedömning 2040: ", bedomning,
+                       "<br/>Bed\u00f6mning 2040: ", bedomning,
                        dplyr::if_else(is.na(balanstal), "",
                                       paste0("<br/>Balanstal: ",
                                              formatC(balanstal, format = "f", digits = 1, decimal.mark = ","),
                                              " %")))
     )
+
+  # Resten samlas i en "Övriga"-stapel längst ned: vit med streckad kant,
+  # utanför färgskalan eftersom den blandar olika bedömningar.
   ovriga <- 1 - sum(dd$andel)
+  ovr_namn <- "\u00d6vriga utbildningar"
+  ovr <- if (ovriga > 0.0005) {
+    data.frame(utbildningsgrupp = ovr_namn, andel = ovriga,
+               tooltip = paste0("<b>", ovr_namn, "</b><br/>", andel_txt, ": ", .pct(ovriga, plus = FALSE),
+                                "<br/>Utbildningar utanf\u00f6r de ", nrow(dd),
+                                " st\u00f6rsta (blandade bed\u00f6mningar)"))
+  }
+  niv <- rev(c(dd$utbildningsgrupp, if (!is.null(ovr)) ovr_namn))
+  dd$utbildningsgrupp <- factor(dd$utbildningsgrupp, levels = niv)
+  if (!is.null(ovr)) ovr$utbildningsgrupp <- factor(ovr$utbildningsgrupp, levels = niv)
 
   g <- ggplot2::ggplot(dd, ggplot2::aes(x = andel, y = utbildningsgrupp)) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(fill = bedomning, tooltip = tooltip, data_id = utbildningsgrupp_kod),
       width = 0.72, color = "grey60", linewidth = 0.2
     ) +
-    ggplot2::geom_text(ggplot2::aes(label = .pct(andel, plus = FALSE, accuracy = 1)),
+    { if (!is.null(ovr)) ggiraph::geom_col_interactive(
+        data = ovr, ggplot2::aes(tooltip = tooltip, data_id = "ovriga"),
+        width = 0.72, fill = "white", color = "grey55", linewidth = 0.4, linetype = "22") } +
+    ggplot2::geom_text(data = dplyr::bind_rows(dd, ovr),
+                       ggplot2::aes(label = .pct(andel, plus = FALSE, accuracy = 1)),
                        hjust = -0.2, size = 3, color = RD_TEXT_MUTED) +
-    ggplot2::scale_fill_manual(values = BEDOMNING_FARGER, drop = TRUE, name = "Bedömning 2040") +
-    ggplot2::scale_y_discrete(labels = scales::label_wrap(45)) +
+    ggplot2::scale_fill_manual(values = BEDOMNING_FARGER, drop = TRUE, name = "Bed\u00f6mning 2040") +
+    ggplot2::scale_y_discrete(limits = niv, labels = scales::label_wrap(45)) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),
                                 expand = ggplot2::expansion(mult = c(0, 0.1))) +
-    ggplot2::labs(x = NULL, y = NULL,
-                  subtitle = paste0(underrubrik,
-                                    if (ovriga > 0.005) paste0(" · övriga utbildningar: ",
-                                                               .pct(ovriga, plus = FALSE)) else ""),
-                  caption = .kalltext(kalla)) +
+    ggplot2::labs(x = NULL, y = NULL, subtitle = underrubrik, caption = .kalltext(kalla)) +
     .rd_tema() +
     ggplot2::theme(legend.position = "top", legend.justification = "left",
                    legend.title = ggplot2::element_text(size = 9, color = RD_TEXT_MUTED)) +
     ggplot2::guides(fill = ggplot2::guide_legend(nrow = 2, byrow = TRUE))
 
-  .girafe_std(g, width_svg = 10, height_svg = nrow(dd) * 0.36 + 2.2)
+  .girafe_std(g, width_svg = 10, height_svg = length(niv) * 0.36 + 2.2)
 }
 
 # Branscher eller yrken mest beroende av bristutbildningar: andel med
