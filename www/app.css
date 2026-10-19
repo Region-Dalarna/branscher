@@ -180,51 +180,42 @@
   box-shadow: none;
 }
 
-/* ---- Startmeddelande: appen är under utveckling -------------------------- */
-/* Overlayn täcker hela fönstret men släpper igenom klick (pointer-events:
-   none) utanför kortet, så den inte blockerar appen bakom. */
+/* ---- Startmeddelande: appen är under utveckling --------------------------
+   Notis nere till höger, i info-rutornas ljusa kulör (samma som .rd-info)
+   så den känns som ett tillfälligt meddelande och inte en del av appens
+   fasta gränssnitt. */
 .rd-dev-notice {
   position: fixed;
-  inset: 0;
+  right: 20px;
+  bottom: 20px;
   z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 72px;
-  pointer-events: none;
+  max-width: 380px;
+  background: var(--rd-info-bg);
+  border-left: 4px solid var(--rd-primary);
+  border-radius: var(--rd-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 18px 40px 18px 20px;
   opacity: 1;
+  transform: translateY(0);
   transition: opacity 0.4s ease, transform 0.4s ease;
 }
 .rd-dev-notice--dold {
   opacity: 0;
-  transform: translateY(-12px);
+  transform: translateY(16px);
   pointer-events: none;
 }
-.rd-dev-notice--dold .rd-dev-notice__kort { pointer-events: none; }
-.rd-dev-notice__kort {
-  position: relative;
-  pointer-events: auto;
-  max-width: 440px;
-  margin: 0 16px;
-  background: #fff;
-  border: 1px solid var(--rd-border);
-  border-top: 4px solid var(--rd-primary);
-  border-radius: var(--rd-radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  padding: 20px 26px 20px 22px;
-}
-.rd-dev-notice__kort h3 {
+.rd-dev-notice h3 {
   margin: 0 0 8px;
   font-size: 1.05rem;
   font-weight: 600;
   padding-right: 20px;
 }
-.rd-dev-notice__kort p {
+.rd-dev-notice p {
   margin: 0 0 8px;
   font-size: 0.9rem;
   line-height: 1.5;
 }
-.rd-dev-notice__kort p:last-child { margin-bottom: 0; }
+.rd-dev-notice p:last-child { margin-bottom: 0; }
 .rd-dev-notice__stang {
   position: absolute;
   top: 8px;
@@ -239,3 +230,12 @@
   cursor: pointer;
 }
 .rd-dev-notice__stang:hover { color: var(--rd-text); }
+
+@media (max-width: 600px) {
+  .rd-dev-notice {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    max-width: none;
+  }
+}

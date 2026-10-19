@@ -24,25 +24,23 @@ shinyUI(
     ),
 
     # ---- Startmeddelande: appen är under utveckling -----------------------
-    # Dyker upp vid start, ligger kvar en lång stund så att alla hinner läsa
-    # den, och går även att stänga direkt med krysset.
+    # Dyker upp som en notis nere till höger vid start, ligger kvar en lång
+    # stund så att alla hinner läsa den, och går även att stänga direkt med
+    # krysset.
     tags$div(
-      id = 'rd-dev-notice', class = 'rd-dev-notice',
-      tags$div(
-        class = 'rd-dev-notice__kort', role = 'status',
-        tags$button(
-          type = 'button', class = 'rd-dev-notice__stang',
-          onclick = "document.getElementById('rd-dev-notice').classList.add('rd-dev-notice--dold')",
-          `aria-label` = 'Stäng meddelandet', HTML('&times;')
-        ),
-        h3('Appen är under utveckling'),
-        p('Den här applikationen byggs och utvecklas löpande. Det kommer att ',
-          'ske en hel del förändringar framöver, så nästa gång du besöker ',
-          'sidan kan den se annorlunda ut.'),
-        p('Har du frågor eller funderingar? Hör gärna av dig till ',
-          tags$a(href = 'mailto:samhallsanalys@regiondalarna.se',
-                 'samhallsanalys@regiondalarna.se'), '.')
+      id = 'rd-dev-notice', class = 'rd-dev-notice', role = 'status',
+      tags$button(
+        type = 'button', class = 'rd-dev-notice__stang',
+        onclick = "document.getElementById('rd-dev-notice').classList.add('rd-dev-notice--dold')",
+        `aria-label` = 'Stäng meddelandet', HTML('&times;')
       ),
+      h3('Appen är under utveckling'),
+      p('Den här applikationen byggs och utvecklas löpande. Det kommer att ',
+        'ske en hel del förändringar framöver, så nästa gång du besöker ',
+        'sidan kan den se annorlunda ut.'),
+      p('Har du frågor eller funderingar? Hör gärna av dig till ',
+        tags$a(href = 'mailto:samhallsanalys@regiondalarna.se',
+               'samhallsanalys@regiondalarna.se'), '.'),
       tags$script(HTML(
         "setTimeout(function() {
            var el = document.getElementById('rd-dev-notice');
