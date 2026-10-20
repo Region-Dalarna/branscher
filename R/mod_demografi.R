@@ -148,14 +148,27 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
 
     # Ett val i en underflik sparas och speglas till den andra. Ålder får
     # vara tom (ignoreNULL = FALSE) -- då sorteras efter storlek.
+    #
+    # speglar: skydd mot studs. När vi speglar ett värde till den andra
+    # flikens kontroll kommer klienten att skicka tillbaka en egen
+    # input-händelse för det (även om värdet är oförändrat) -- annars
+    # skulle den händelsen tolkas som ett nytt användarval och speglas
+    # tillbaka igen, vilket kan studsa fram och tillbaka mellan flikarna.
+    # Märks tydligast för ålder (flera valda värden i en
+    # individual = TRUE-knapprad): klienten speglar inte alltid hela
+    # urvalet korrekt vid programmatisk uppdatering, så utan skyddet kan
+    # diagrammet fastna och pendla mellan två olika urval av ålderval.
     synka <- function(namn, rv, uppdatera, tom_tillaten = FALSE) {
+      speglar <- FALSE
       for (s in suffix) local({
         egen <- paste0(namn, s)
         andra <- paste0(namn, setdiff(suffix, s))
         shiny::observeEvent(input[[egen]], ignoreInit = TRUE, ignoreNULL = !tom_tillaten, {
+          if (speglar) { speglar <<- FALSE; return() }
           val <- input[[egen]] %||% character(0)
           if (identical(sort(val), sort(rv()))) return()
           rv(val)
+          speglar <<- TRUE
           uppdatera(session, andra, selected = val)
         })
       })
