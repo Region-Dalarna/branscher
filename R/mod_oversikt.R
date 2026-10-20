@@ -73,7 +73,7 @@ mod_oversikt_ui <- function(id) {
 
           div(class = 'rd-card',
               h2('Andel sysselsatta per bransch'),
-              div(class = 'rd-subtitle', 'Vald geografi, l\u00e4net (Dalarna) och riket'),
+              div(class = 'rd-subtitle', textOutput(ns('jamforelse_underrubrik'), inline = TRUE)),
               girafeOutput(ns('plot_jamforelse'), height = '600px')
           )
       )
@@ -195,6 +195,10 @@ mod_oversikt_server <- function(id) {
 
       if (is.na(valt) || is.na(totalt) || totalt == 0) return('\u2013')
       scales::percent(valt / totalt, accuracy = 0.1, decimal.mark = ',')
+    })
+
+    output$jamforelse_underrubrik <- renderText({
+      paste0(geografi_namn(), ', länet (Dalarna) och riket')
     })
 
     output$plot_jamforelse <- renderGirafe({
