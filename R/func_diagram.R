@@ -74,8 +74,11 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "", geo_namn =
       markerad = grupp_namn %in% markerad_grupp
     )
 
+  # Sortera efter "vald" om den finns (en kommun); annars efter "lan"
+  # (vald geografi ÄR länet, så det finns ingen separat "vald"-rad).
+  sorteringsniva <- if ("vald" %in% d$geo_niva) "vald" else "lan"
   ordning <- d |>
-    dplyr::filter(geo_niva == "vald") |>
+    dplyr::filter(geo_niva == sorteringsniva) |>
     dplyr::arrange(dplyr::desc(andel)) |>
     dplyr::pull(grupp_namn)
 

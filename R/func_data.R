@@ -136,7 +136,9 @@ hamta_kommuner <- function() {
 }
 
 # Returnerar sysselsatta per bransch för tre geografinivåer samtidigt
-# ("vald", "lan", "riket"), enligt vald indelningskolumn och valt år.
+# ("vald", "lan", "riket"), enligt vald indelningskolumn och valt år. Om
+# geografi redan ÄR länet (LAN_KOD_DALARNA) utelämnas "vald" -- den vore
+# bara en duplicerad kopia av "lan".
 hamta_oversiktsdata <- function(indelning_kolumn, geografi, ar_val) {
   dim_br <- hamta_dim_bransch() |>
     dplyr::select(branschkod, grupp_namn = dplyr::all_of(indelning_kolumn)) |>
@@ -153,6 +155,10 @@ hamta_oversiktsdata <- function(indelning_kolumn, geografi, ar_val) {
     dplyr::filter(geo_niva %in% c("lan", "riket")) |>
     dplyr::group_by(grupp_namn, geo_niva) |>
     dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop")
+
+  if (geografi == LAN_KOD_DALARNA) {
+    return(lan_riket |> prick_smavarden(varde_kol = "antal"))
+  }
 
   vald <- dplyr::filter(bas, kommun_kod == geografi)
   vald <- vald |>

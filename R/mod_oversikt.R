@@ -144,7 +144,7 @@ mod_oversikt_server <- function(id) {
     # ("Vald geografi" → t.ex. kommunnamnet eller "Hela Dalarna (länet)").
     geografi_namn <- shiny::reactive({
       shiny::req(input$geografi_val)
-      if (input$geografi_val == '20') 'Hela Dalarna (länet)'
+      if (input$geografi_val == LAN_KOD_DALARNA) 'Hela Dalarna (länet)'
       else {
         namn <- kommuner$kommun_namn[match(input$geografi_val, kommuner$kommun_kod)]
         if (is.na(namn)) 'Vald geografi' else namn
@@ -198,7 +198,9 @@ mod_oversikt_server <- function(id) {
     })
 
     output$jamforelse_underrubrik <- renderText({
-      paste0(geografi_namn(), ', länet (Dalarna) och riket')
+      shiny::req(input$geografi_val)
+      if (input$geografi_val == LAN_KOD_DALARNA) 'Länet (Dalarna) och riket'
+      else paste0(geografi_namn(), ', länet (Dalarna) och riket')
     })
 
     output$plot_jamforelse <- renderGirafe({
