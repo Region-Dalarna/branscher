@@ -8,8 +8,10 @@
 #     region_ast, region_bo, kon, branschkod, bransch, matt, antal.
 #     Population = sysselsatta med arbetsställe i Dalarnas kommuner,
 #     länet (regionkod_ast == "20") eller riket (regionkod_ast == "00").
-#     alder/bakgrund/kon/regionkod_bo används INTE av appen och summeras
-#     bort redan i databasen vid inläsning (se hamta_syss_branscher()).
+#     alder/regionkod_bo används INTE av appen och summeras bort redan i
+#     databasen vid inläsning (se hamta_syss_branscher()); kon/bakgrund
+#     läses separat vid behov (se hamta_syss_branscher_dim()) för
+#     nedbrytningarna i "Sysselsatta per bransch" på Översikt.
 #     En framtida pendlingsflik får göra en egen fråga på regionkod_bo.
 #   - nycklar.sni_huvudgrupper -- SNI-branschkoder (2-siffrigt) med fyra
 #     färdiga branschindelningar som egna kolumner (bransch_20, bransch_37,
@@ -203,18 +205,19 @@ hamta_total_etablerade <- function(geografi, ar_val, branschkoder = NULL) {
 # Antal sysselsatta per år, för en geografi -- hela urvalet
 # (branschkoder = NULL) eller en eller flera SNI-koder (t.ex. från
 # hamta_branschkoder()). Grund för tidsserien på Översikt när man
-# klickar på en stapel i "Sysselsatta per bransch". per_kon = TRUE delar
-# upp på kön (en rad per år och kön) i stället för en totalrad per år --
-# håller tidsserien i synk med Könsuppdelat/Totalt-läget i stapeldiagrammet.
-hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL, per_kon = FALSE) {
-  if (per_kon) {
-    d <- hamta_syss_branscher_kon() |>
+# klickar på en stapel i "Sysselsatta per bransch". dimension = "kon"
+# eller "bakgrund" delar upp på den dimensionen (en rad per år och
+# grupp_dim) i stället för en totalrad per år -- håller tidsserien i
+# synk med Könsuppdelat/Inrikes-utrikes/Totalt-läget i stapeldiagrammet.
+hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL, dimension = NULL) {
+  if (!is.null(dimension)) {
+    d <- hamta_syss_branscher_dim(dimension) |>
       dplyr::filter(matt == "sysselsatta", kommun_kod == geografi)
     if (!is.null(branschkoder)) d <- dplyr::filter(d, branschkod %in% branschkoder)
     d |>
-      dplyr::group_by(ar, kon) |>
+      dplyr::group_by(ar, grupp_dim) |>
       dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
-      dplyr::arrange(ar, kon) |>
+      dplyr::arrange(ar, grupp_dim) |>
       prick_smavarden(varde_kol = "antal")
   } else {
     d <- hamta_syss_branscher() |>
@@ -228,61 +231,71 @@ hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL, per_kon = FALSE
   }
 }
 
-# ---- Sysselsatta per bransch och kön (stapeldiagrammet på Översikt) ------
+# ---- Sysselsatta per bransch och kön/bakgrund (stapeldiagrammet på Översikt) ------
 #
 # Till skillnad från hamta_syss_branscher() (som medvetet summerar bort
-# kön/ålder/bakgrund redan i databasen) behåller denna frågan kön, för
-# att kunna visa ett könsuppdelat stapeldiagram. De exakta textsträngarna
-# i mikro_db.syss_branscher (kon-kolumnen) är inte bekräftade, så övriga
-# kod läser kön-värdena direkt ur resultatet i stället för att anta dem.
+# kön/ålder/bakgrund redan i databasen) behåller denna frågan kön resp.
+# bakgrund (inrikes/utrikes född), för att kunna visa ett uppdelat
+# stapeldiagram/tidsserie. De exakta textsträngarna i mikro_db.syss_branscher
+# (kon- och bakgrund-kolumnerna) är inte bekräftade, så övrig kod läser
+# nedbrytningsvärdena direkt ur resultatet i stället för att anta dem.
 
-.syss_kon_cache <- new.env(parent = emptyenv())
+.syss_dim_cache <- new.env(parent = emptyenv())
 
-rensa_syss_branscher_kon <- function(rad) {
+rensa_syss_branscher_dim <- function(rad, dimension) {
   rad |>
     dplyr::transmute(
       ar         = as.integer(ar),
       matt       = matt,
       branschkod = sprintf("%02d", as.integer(branschkod)),
       kommun_kod = as.character(regionkod_ast),
-      kon        = as.character(kon),
+      grupp_dim  = as.character(.data[[dimension]]),
       antal      = as.numeric(antal)
     )
 }
 
-hamta_syss_branscher_kon <- function(force = FALSE) {
-  if (force || is.null(.syss_kon_cache$df)) {
+# dimension = "kon" eller "bakgrund" -- vilken av mikro_db.syss_branschers
+# nedbrytningskolumner som ska behållas (utöver dem som alltid grupperas
+# bort, se hamta_syss_branscher()). Resultatets nedbrytningsvärde ligger
+# alltid i kolumnen grupp_dim, oavsett vilken dimension som valdes, så att
+# anroparen (stapeldiagrammet/tidsserien) inte behöver bry sig om vilken
+# av de två det är.
+hamta_syss_branscher_dim <- function(dimension = c("kon", "bakgrund"), force = FALSE) {
+  dimension <- match.arg(dimension)
+  if (force || is.null(.syss_dim_cache[[dimension]])) {
     con <- shiny_uppkoppling_las("oppna_data")
     rad <- dplyr::tbl(con, dbplyr::in_schema("mikro_db", "syss_branscher")) |>
-      dplyr::group_by(ar, matt, regionkod_ast, branschkod, kon) |>
+      dplyr::group_by(ar, matt, regionkod_ast, branschkod, .data[[dimension]]) |>
       dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
       dplyr::collect()
     DBI::dbDisconnect(con)
-    .syss_kon_cache$df <- rensa_syss_branscher_kon(rad)
+    .syss_dim_cache[[dimension]] <- rensa_syss_branscher_dim(rad, dimension)
   }
-  .syss_kon_cache$df
+  .syss_dim_cache[[dimension]]
 }
 
-# Antal sysselsatta per bransch (i vald indelning), uppdelat på kön samt
-# en beräknad "Totalt"-rad (källdatan har ingen egen totalrad för kön).
-# totalt_varde avgör vilket värde "Totalt"-raden får i kon-kolumnen.
-hamta_bransch_sysselsatta <- function(indelning_kolumn, geografi, ar_val, totalt_varde) {
+# Antal sysselsatta per bransch (i vald indelning), uppdelat på en
+# dimension (kön eller bakgrund) samt en beräknad "Totalt"-rad (källdatan
+# har ingen egen totalrad för kön/bakgrund). totalt_varde avgör vilket
+# värde "Totalt"-raden får i grupp_dim-kolumnen.
+hamta_bransch_sysselsatta <- function(indelning_kolumn, geografi, ar_val, totalt_varde,
+                                      dimension = "kon") {
   dim_br <- hamta_dim_bransch() |>
     dplyr::select(branschkod, grupp_namn = dplyr::all_of(indelning_kolumn)) |>
     dplyr::filter(!is.na(grupp_namn), grupp_namn != "")
 
-  per_kon <- hamta_syss_branscher_kon() |>
+  per_grupp <- hamta_syss_branscher_dim(dimension) |>
     dplyr::filter(ar == ar_val, matt == "sysselsatta", kommun_kod == geografi) |>
     dplyr::inner_join(dim_br, by = "branschkod") |>
-    dplyr::group_by(grupp_namn, kon) |>
+    dplyr::group_by(grupp_namn, grupp_dim) |>
     dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop")
 
-  totalt <- per_kon |>
+  totalt <- per_grupp |>
     dplyr::group_by(grupp_namn) |>
     dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
-    dplyr::mutate(kon = totalt_varde)
+    dplyr::mutate(grupp_dim = totalt_varde)
 
-  dplyr::bind_rows(totalt, per_kon) |>
+  dplyr::bind_rows(totalt, per_grupp) |>
     prick_smavarden(varde_kol = "antal")
 }
 

@@ -17,10 +17,10 @@
 # Värdet för "Alla branscher" i branschväljaren.
 ALLA_BRANSCHER <- '__alla__'
 
-# Värdet för "Totalt"-raden (båda könen, beräknad) i resultatet från
-# hamta_bransch_sysselsatta() -- se func_data.R. Används för att plocka ut
-# totalraden resp. de riktiga kön-raderna för stapeldiagrammet
-# "Sysselsatta per bransch".
+# Värdet för "Totalt"-raden (beräknad, summerad över hela dimensionen) i
+# resultatet från hamta_bransch_sysselsatta() -- se func_data.R. Används
+# för att plocka ut totalraden resp. de riktiga nedbrytningsraderna
+# (kön eller bakgrund) för stapeldiagrammet "Sysselsatta per bransch".
 VY_TOTALT <- '__totalt__'
 
 mod_oversikt_ui <- function(id) {
@@ -89,8 +89,10 @@ mod_oversikt_ui <- function(id) {
               girafeOutput(ns('plot_bransch_sysselsatta'), height = 'auto'),
               div(class = 'rd-hint', 'Klicka på en bransch för att se utvecklingen över tid.'),
               div(class = 'rd-kon-kontroll',
-                  shinyWidgets::radioGroupButtons(ns('kon_lage'), label = NULL,
-                                                  choices  = c('Könsuppdelat' = 'kon', 'Totalt' = 'total'),
+                  shinyWidgets::radioGroupButtons(ns('dim_lage'), label = NULL,
+                                                  choices  = c('Könsuppdelat' = 'kon',
+                                                               'Inrikes/utrikes födda' = 'bakgrund',
+                                                               'Totalt' = 'total'),
                                                   selected = 'kon', size = 'sm'))
           ),
 
@@ -238,13 +240,20 @@ mod_oversikt_server <- function(id) {
 
     # ---- Sysselsatta per bransch (stapeldiagram, klickbart) + tidsserie --
 
+    # dimension: vilken nedbrytning ("kon"/"bakgrund") som ska hämtas utöver
+    # totalraden. Vid Totalt-läget spelar det ingen roll vilken som väljs
+    # här -- totalsumman blir densamma oavsett dimension -- så "kon"
+    # används som default.
     bransch_sysselsatta <- shiny::reactive({
       shiny::req(input$indelning_val, input$geografi_val, input$ar_val)
+      lage      <- input$dim_lage %||% 'kon'
+      dimension <- if (identical(lage, 'bakgrund')) 'bakgrund' else 'kon'
       hamta_bransch_sysselsatta(
         indelning_kolumn = input$indelning_val,
         geografi          = input$geografi_val,
         ar_val            = as.integer(input$ar_val),
-        totalt_varde      = VY_TOTALT
+        totalt_varde      = VY_TOTALT,
+        dimension         = dimension
       )
     })
 
@@ -254,17 +263,18 @@ mod_oversikt_server <- function(id) {
     })
 
     output$plot_bransch_sysselsatta <- renderGirafe({
-      lage <- input$kon_lage %||% 'kon'
+      lage <- input$dim_lage %||% 'kon'
       if (identical(lage, 'total')) {
-        d <- bransch_sysselsatta() |> dplyr::filter(kon == VY_TOTALT)
+        d <- bransch_sysselsatta() |> dplyr::filter(grupp_dim == VY_TOTALT)
         skapa_diagram_bransch_sysselsatta(
           d, klickad = klickad_bransch(), farg = RD_PRIMARY,
           kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
         )
       } else {
-        d <- bransch_sysselsatta() |> dplyr::filter(kon != VY_TOTALT)
-        skapa_diagram_bransch_sysselsatta_kon(
-          d, klickad = klickad_bransch(),
+        d <- bransch_sysselsatta() |> dplyr::filter(grupp_dim != VY_TOTALT)
+        farg_matchare <- if (identical(lage, 'bakgrund')) .bakgrund_farg_match else .kon_farg_match
+        skapa_diagram_bransch_sysselsatta_grupp(
+          d, klickad = klickad_bransch(), farg_matchare = farg_matchare,
           kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
         )
       }
@@ -296,14 +306,15 @@ mod_oversikt_server <- function(id) {
       else paste0(geografi_namn(), ' \u00b7 klicka p\u00e5 en annan stapel ovan f\u00f6r att byta bransch')
     })
 
-    # Samma K\u00f6nsuppdelat/Totalt-l\u00e4ge som stapeldiagrammet ovan styr om
-    # tidsserien visas som en totallinje eller en linje per k\u00f6n.
+    # Samma dim_lage (K\u00f6nsuppdelat/Inrikes-utrikes f\u00f6dda/Totalt) som
+    # stapeldiagrammet ovan styr om tidsserien visas som en totallinje
+    # eller en linje per grupp i den valda dimensionen.
     output$plot_sysselsatta_tid <- renderGirafe({
       shiny::req(input$geografi_val, input$indelning_val)
       b <- klickad_bransch()
       branschkoder <- if (is.null(b)) NULL else hamta_branschkoder(input$indelning_val, b)
       underrubrik  <- if (is.null(b)) 'Alla branscher' else b
-      lage <- input$kon_lage %||% 'kon'
+      lage <- input$dim_lage %||% 'kon'
       if (identical(lage, 'total')) {
         d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder)
         skapa_diagram_sysselsatta_tid(
@@ -311,9 +322,11 @@ mod_oversikt_server <- function(id) {
           kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
         )
       } else {
-        d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder, per_kon = TRUE)
-        skapa_diagram_sysselsatta_tid_kon(
-          d, underrubrik = underrubrik,
+        dimension     <- if (identical(lage, 'bakgrund')) 'bakgrund' else 'kon'
+        farg_matchare <- if (identical(lage, 'bakgrund')) .bakgrund_farg_match else .kon_farg_match
+        d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder, dimension = dimension)
+        skapa_diagram_sysselsatta_tid_grupp(
+          d, farg_matchare = farg_matchare, underrubrik = underrubrik,
           kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
         )
       }

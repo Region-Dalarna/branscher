@@ -16,6 +16,12 @@ RD_TEXT_MUTED <- "#6c757d"
 
 KON_FARGER <- c("Kvinnor" = "#e2a855", "M\u00e4n" = "#459079")
 
+# Inrikes/utrikes f\u00f6dda -- samma anv\u00e4ndning som KON_FARGER (bakgrunds-
+# uppdelningen i "Sysselsatta per bransch" p\u00e5 \u00d6versikt). Inrikes f\u00f6dda
+# delar f\u00e4rg med RD_PRIMARY eftersom det \u00e4r samma f\u00e4rg som "Totalt"-
+# vyn redan anv\u00e4nder (den st\u00f6rre gruppen).
+BAKGRUND_FARGER <- c("Inrikes f\u00f6dda" = RD_PRIMARY, "Utrikes f\u00f6dda" = "#eb6834")
+
 # ggiraph-interaktion: samma "tippy"-look som app.css (tippy-box[data-theme~='rd'])
 RD_TOOLTIP_CSS <- paste0(
   "background-color:", RD_TEXT, "; color:#fff; font-family:Poppins,Arial,sans-serif;",

@@ -172,13 +172,29 @@ skapa_diagram_bransch_sysselsatta <- function(df, klickad = NULL, farg = RD_PRIM
   RD_ACCENT
 }
 
-# ---- Stapeldiagram: antal sysselsatta per bransch, könsuppdelat (staplad) --
+# Bakgrundsfärg (inrikes/utrikes född) utifrån den faktiska textsträngen i
+# källdatan (okänd exakt stavning/skiftläge, se func_data.R) -- samma
+# mönster som .kon_farg_match(), case-okänslig delmatchning mot
+# BAKGRUND_FARGER, annars accentfärgen.
+.bakgrund_farg_match <- function(namn) {
+  n <- tolower(namn %||% "")
+  if (grepl("utrikes", n)) return(unname(BAKGRUND_FARGER["Utrikes födda"]))
+  if (grepl("inrikes", n)) return(unname(BAKGRUND_FARGER["Inrikes födda"]))
+  RD_ACCENT
+}
+
+# ---- Stapeldiagram: antal sysselsatta per bransch, uppdelat på en dimension
+# (kön eller bakgrund) (staplad) -------------------------------------------
 # Samma klick-/sekretessmönster som skapa_diagram_bransch_sysselsatta(), men
-# staplad per kön (fyllningsfärg) i stället för en enfärgad stapel. df ska
-# bara innehålla kön-raderna (Totalt-raden filtreras bort av anroparen).
-skapa_diagram_bransch_sysselsatta_kon <- function(df, klickad = NULL,
-                                                  rubrik = NULL, underrubrik = NULL,
-                                                  kalla = NULL) {
+# staplad per grupp_dim (fyllningsfärg, t.ex. kön eller inrikes/utrikes
+# född) i stället för en enfärgad stapel. df ska bara innehålla
+# nedbrytningsraderna (Totalt-raden filtreras bort av anroparen) och en
+# grupp_dim-kolumn (se hamta_bransch_sysselsatta() i func_data.R).
+# farg_matchare: funktion(namn) -> hex-färg, t.ex. .kon_farg_match eller
+# .bakgrund_farg_match.
+skapa_diagram_bransch_sysselsatta_grupp <- function(df, klickad = NULL, farg_matchare,
+                                                    rubrik = NULL, underrubrik = NULL,
+                                                    kalla = NULL) {
   if (nrow(df) == 0) {
     return(.girafe_std(.tom_plot("Inga värden att visa"), height_svg = 1.5))
   }
@@ -196,15 +212,15 @@ skapa_diagram_bransch_sysselsatta_kon <- function(df, klickad = NULL,
       antal_vy   = dplyr::if_else(dold, 0, antal),
       tooltip    = dplyr::if_else(
         dold,
-        paste0("<b>", grupp_namn, "</b><br/>", kon, ": Färre än 4 (redovisas inte av sekretesskäl)"),
-        paste0("<b>", grupp_namn, "</b><br/>", kon, ": ", scales::number(antal, big.mark = " "))
+        paste0("<b>", grupp_namn, "</b><br/>", grupp_dim, ": Färre än 4 (redovisas inte av sekretesskäl)"),
+        paste0("<b>", grupp_namn, "</b><br/>", grupp_dim, ": ", scales::number(antal, big.mark = " "))
       )
     )
 
   rand <- intersect(as.character(klickad), as.character(d$grupp_namn))
-  farger <- stats::setNames(vapply(unique(d$kon), .kon_farg_match, character(1)), unique(d$kon))
+  farger <- stats::setNames(vapply(unique(d$grupp_dim), farg_matchare, character(1)), unique(d$grupp_dim))
 
-  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn, fill = kon, group = kon)) +
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn, fill = grupp_dim, group = grupp_dim)) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(tooltip = tooltip, data_id = grupp_namn),
       width = 0.72
@@ -246,22 +262,26 @@ skapa_diagram_sysselsatta_tid <- function(df, farg = RD_PRIMARY, rubrik = NULL,
   .girafe_std(g, width_svg = 9, height_svg = 4.2, selection = FALSE)
 }
 
-# ---- Linjediagram: utveckling av antal sysselsatta över tid, könsuppdelat --
+# ---- Linjediagram: utveckling av antal sysselsatta över tid, uppdelat på
+# en dimension (kön eller bakgrund) -----------------------------------------
 # Samma uppbyggnad som skapa_diagram_sysselsatta_tid(), men en linje per
-# kön (färg via .kon_farg_match(), legend högst upp) i stället för en enda
-# totallinje. df ska innehålla en kon-kolumn (se hamta_sysselsatta_tid()).
-skapa_diagram_sysselsatta_tid_kon <- function(df, rubrik = NULL, underrubrik = NULL, kalla = NULL) {
+# grupp_dim (färg via farg_matchare, legend högst upp) i stället för en
+# enda totallinje. df ska innehålla en grupp_dim-kolumn (se
+# hamta_sysselsatta_tid()). farg_matchare: funktion(namn) -> hex-färg,
+# t.ex. .kon_farg_match eller .bakgrund_farg_match.
+skapa_diagram_sysselsatta_tid_grupp <- function(df, farg_matchare, rubrik = NULL,
+                                                underrubrik = NULL, kalla = NULL) {
   if (nrow(df) == 0 || all(is.na(df$antal))) {
     return(.girafe_std(.tom_plot("Inga värden att visa"), height_svg = 1.5))
   }
   d <- df |>
-    dplyr::mutate(tooltip = paste0("<b>", ar, "</b><br/>", kon, ": ",
+    dplyr::mutate(tooltip = paste0("<b>", ar, "</b><br/>", grupp_dim, ": ",
                                    dplyr::if_else(is.na(antal), "Färre än 4",
                                                   paste(scales::number(antal, big.mark = " "), "sysselsatta"))))
 
-  farger <- stats::setNames(vapply(unique(d$kon), .kon_farg_match, character(1)), unique(d$kon))
+  farger <- stats::setNames(vapply(unique(d$grupp_dim), farg_matchare, character(1)), unique(d$grupp_dim))
 
-  g <- ggplot2::ggplot(d, ggplot2::aes(x = ar, y = antal, color = kon, group = kon)) +
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = ar, y = antal, color = grupp_dim, group = grupp_dim)) +
     ggplot2::geom_line(linewidth = 1, na.rm = TRUE) +
     ggiraph::geom_point_interactive(ggplot2::aes(tooltip = tooltip), size = 2.2, na.rm = TRUE) +
     ggplot2::scale_color_manual(values = farger, name = NULL) +
