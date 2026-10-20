@@ -206,9 +206,17 @@ skapa_diagram_utbildningar <- function(d, topp_n = 20, andel_txt = "Andel",
                                 "<br/>Utbildningar utanf\u00f6r de ", nrow(dd),
                                 " st\u00f6rsta (blandade bed\u00f6mningar)"))
   }
-  niv <- rev(c(dd$utbildningsgrupp, if (!is.null(ovr)) ovr_namn))
-  dd$utbildningsgrupp <- factor(dd$utbildningsgrupp, levels = niv)
-  if (!is.null(ovr)) ovr$utbildningsgrupp <- factor(ovr$utbildningsgrupp, levels = niv)
+
+  # SCB:s korta utbildningsnamn är inte garanterat unika mellan olika
+  # utbildningsgrupp_kod -- factor() kräver unika levels, så vi särskiljer
+  # dem internt (make.unique) men visar ändå det riktiga namnet på y-axeln.
+  namn <- c(as.character(dd$utbildningsgrupp), if (!is.null(ovr)) ovr_namn)
+  id   <- make.unique(namn, sep = " · ")
+  niv  <- rev(id)
+  visningsnamn <- stats::setNames(namn, id)
+
+  dd$utbildningsgrupp <- factor(id[seq_len(nrow(dd))], levels = niv)
+  if (!is.null(ovr)) ovr$utbildningsgrupp <- factor(utils::tail(id, 1), levels = niv)
 
   g <- ggplot2::ggplot(dd, ggplot2::aes(x = andel, y = utbildningsgrupp)) +
     ggiraph::geom_col_interactive(
@@ -222,7 +230,8 @@ skapa_diagram_utbildningar <- function(d, topp_n = 20, andel_txt = "Andel",
                        ggplot2::aes(label = .pct(andel, plus = FALSE, accuracy = 1)),
                        hjust = -0.2, size = 3, color = RD_TEXT_MUTED) +
     ggplot2::scale_fill_manual(values = BEDOMNING_FARGER, drop = TRUE, name = "Bed\u00f6mning 2040") +
-    ggplot2::scale_y_discrete(limits = niv, labels = scales::label_wrap(45)) +
+    ggplot2::scale_y_discrete(limits = niv,
+                              labels = function(x) scales::label_wrap(45)(visningsnamn[x])) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),
                                 expand = ggplot2::expansion(mult = c(0, 0.1))) +
     ggplot2::labs(x = NULL, y = NULL, subtitle = underrubrik, caption = .kalltext(kalla)) +
