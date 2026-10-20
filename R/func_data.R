@@ -200,6 +200,84 @@ hamta_total_etablerade <- function(geografi, ar_val, branschkoder = NULL) {
   hamta_matt_totalt("etablerade", geografi, ar_val, branschkoder)
 }
 
+# Antal sysselsatta per år, för en geografi -- hela urvalet
+# (branschkoder = NULL) eller en eller flera SNI-koder (t.ex. från
+# hamta_branschkoder()). Grund för tidsserien på Översikt när man
+# klickar på en stapel i "Sysselsatta per bransch".
+hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL) {
+  d <- hamta_syss_branscher() |>
+    dplyr::filter(matt == "sysselsatta", kommun_kod == geografi)
+  if (!is.null(branschkoder)) d <- dplyr::filter(d, branschkod %in% branschkoder)
+  d |>
+    dplyr::group_by(ar) |>
+    dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
+    dplyr::arrange(ar) |>
+    prick_smavarden(varde_kol = "antal")
+}
+
+# ---- Sysselsatta per bransch och kön (stapeldiagrammet på Översikt) ------
+#
+# Till skillnad från hamta_syss_branscher() (som medvetet summerar bort
+# kön/ålder/bakgrund redan i databasen) behåller denna frågan kön, för
+# att kunna visa "Totalt"/"Kvinnor"/"Män" som egna vyer. Könsvärdena
+# läses ur källdatan (hamta_kon_lista()) i stället för att antas, eftersom
+# de exakta textsträngarna i mikro_db.syss_branscher inte är bekräftade.
+
+.syss_kon_cache <- new.env(parent = emptyenv())
+
+rensa_syss_branscher_kon <- function(rad) {
+  rad |>
+    dplyr::transmute(
+      ar         = as.integer(ar),
+      matt       = matt,
+      branschkod = sprintf("%02d", as.integer(branschkod)),
+      kommun_kod = as.character(regionkod_ast),
+      kon        = as.character(kon),
+      antal      = as.numeric(antal)
+    )
+}
+
+hamta_syss_branscher_kon <- function(force = FALSE) {
+  if (force || is.null(.syss_kon_cache$df)) {
+    con <- shiny_uppkoppling_las("oppna_data")
+    rad <- dplyr::tbl(con, dbplyr::in_schema("mikro_db", "syss_branscher")) |>
+      dplyr::group_by(ar, matt, regionkod_ast, branschkod, kon) |>
+      dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
+      dplyr::collect()
+    DBI::dbDisconnect(con)
+    .syss_kon_cache$df <- rensa_syss_branscher_kon(rad)
+  }
+  .syss_kon_cache$df
+}
+
+# Könsvärden som faktiskt förekommer i källdatan, för väljaren i UI:t.
+hamta_kon_lista <- function() {
+  sort(unique(hamta_syss_branscher_kon()$kon))
+}
+
+# Antal sysselsatta per bransch (i vald indelning), uppdelat på kön samt
+# en beräknad "Totalt"-rad (källdatan har ingen egen totalrad för kön).
+# totalt_varde avgör vilket värde "Totalt"-raden får i kon-kolumnen.
+hamta_bransch_sysselsatta <- function(indelning_kolumn, geografi, ar_val, totalt_varde) {
+  dim_br <- hamta_dim_bransch() |>
+    dplyr::select(branschkod, grupp_namn = dplyr::all_of(indelning_kolumn)) |>
+    dplyr::filter(!is.na(grupp_namn), grupp_namn != "")
+
+  per_kon <- hamta_syss_branscher_kon() |>
+    dplyr::filter(ar == ar_val, matt == "sysselsatta", kommun_kod == geografi) |>
+    dplyr::inner_join(dim_br, by = "branschkod") |>
+    dplyr::group_by(grupp_namn, kon) |>
+    dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop")
+
+  totalt <- per_kon |>
+    dplyr::group_by(grupp_namn) |>
+    dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
+    dplyr::mutate(kon = totalt_varde)
+
+  dplyr::bind_rows(totalt, per_kon) |>
+    prick_smavarden(varde_kol = "antal")
+}
+
 # --- Sekretess/döljning ---------------------------------------------------
 
 prick_smavarden <- function(df, varde_kol, troskel = 4) {

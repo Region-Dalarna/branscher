@@ -113,3 +113,81 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "", geo_namn =
               selection  = TRUE
   )
 }
+
+# ---- Stapeldiagram: antal sysselsatta per bransch ------------------------
+# Klickbar (data_id = grupp_namn) -- fångas upp av modulen som
+# input$<outputId>_selected och styr tidsseriediagrammet nedan. Rader med
+# NA (sekretessbelagda smávärden, se prick_smavarden()) visas som en tom
+# stapel med en egen förklarande tooltip i stället för att döljas, så att
+# branschlistan inte ser ofullständig ut.
+skapa_diagram_bransch_sysselsatta <- function(df, klickad = NULL, farg = RD_PRIMARY,
+                                              rubrik = NULL, underrubrik = NULL,
+                                              kalla = NULL) {
+  if (nrow(df) == 0) {
+    return(.girafe_std(.tom_plot("Inga värden att visa"), height_svg = 1.5))
+  }
+  ordning <- df |> dplyr::arrange(dplyr::desc(dplyr::coalesce(antal, 0))) |> dplyr::pull(grupp_namn)
+  niv <- rev(ordning)
+
+  d <- df |>
+    dplyr::mutate(
+      grupp_namn = factor(grupp_namn, levels = niv),
+      dold       = is.na(antal),
+      antal_vy   = dplyr::if_else(dold, 0, antal),
+      tooltip    = dplyr::if_else(
+        dold,
+        paste0("<b>", grupp_namn, "</b><br/>Färre än 4 (redovisas inte av sekretesskäl)"),
+        paste0("<b>", grupp_namn, "</b><br/>", scales::number(antal, big.mark = " "), " sysselsatta")
+      )
+    )
+
+  rand <- intersect(as.character(klickad), as.character(d$grupp_namn))
+
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn))
+  if (length(rand) > 0) {
+    g <- g + ggplot2::geom_tile(
+      data = data.frame(grupp_namn = factor(rand, levels = niv)),
+      ggplot2::aes(x = max(d$antal_vy) * 0.52, y = grupp_namn),
+      width = max(d$antal_vy) * 1.04, height = 0.96, fill = "#d6ebf2",
+      inherit.aes = FALSE
+    )
+  }
+  g <- g +
+    ggiraph::geom_col_interactive(
+      ggplot2::aes(tooltip = tooltip, data_id = grupp_namn),
+      fill = farg, width = 0.72
+    ) +
+    ggplot2::scale_x_continuous(labels = scales::number_format(big.mark = " "),
+                                expand = ggplot2::expansion(mult = c(0, 0.04))) +
+    ggplot2::labs(x = NULL, y = NULL, title = rubrik, subtitle = underrubrik,
+                  caption = .kalltext(kalla)) +
+    .rd_tema()
+
+  .girafe_std(g, width_svg = 9, height_svg = max(5, dplyr::n_distinct(d$grupp_namn) * 0.38 + 1.5),
+              selection = TRUE)
+}
+
+# ---- Linjediagram: utveckling av antal sysselsatta över tid --------------
+skapa_diagram_sysselsatta_tid <- function(df, farg = RD_PRIMARY, rubrik = NULL,
+                                          underrubrik = NULL, kalla = NULL) {
+  if (nrow(df) == 0 || all(is.na(df$antal))) {
+    return(.girafe_std(.tom_plot("Inga värden att visa"), height_svg = 1.5))
+  }
+  d <- df |>
+    dplyr::mutate(tooltip = paste0("<b>", ar, "</b><br/>",
+                                   dplyr::if_else(is.na(antal), "Färre än 4",
+                                                  paste(scales::number(antal, big.mark = " "), "sysselsatta"))))
+
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = ar, y = antal)) +
+    ggplot2::geom_line(color = farg, linewidth = 1, na.rm = TRUE) +
+    ggiraph::geom_point_interactive(ggplot2::aes(tooltip = tooltip), color = farg, size = 2.2,
+                                    na.rm = TRUE) +
+    ggplot2::scale_x_continuous(breaks = scales::breaks_pretty()) +
+    ggplot2::scale_y_continuous(labels = scales::number_format(big.mark = " "),
+                                expand = ggplot2::expansion(mult = c(0.08, 0.1))) +
+    ggplot2::labs(x = NULL, y = NULL, title = rubrik, subtitle = underrubrik,
+                  caption = .kalltext(kalla)) +
+    .rd_tema()
+
+  .girafe_std(g, width_svg = 9, height_svg = 4.2, selection = FALSE)
+}

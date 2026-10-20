@@ -17,6 +17,21 @@
 # Värdet för "Alla branscher" i branschväljaren.
 ALLA_BRANSCHER <- '__alla__'
 
+# Värdet för "Totalt" (båda könen) i vy-väljaren för stapeldiagrammet
+# "Sysselsatta per bransch". De övriga valen fylls i vid körning med de
+# könsvärden som faktiskt finns i källdatan (hamta_kon_lista()).
+VY_TOTALT <- '__totalt__'
+
+# Färg för vy-väljarens stapeldiagram: "Totalt" = primärfärgen, kön som
+# matchar "kvin.../män/man" i KON_FARGER, annat okänt värde = accentfärg.
+.vy_farg <- function(vy) {
+  if (identical(vy, VY_TOTALT)) return(RD_PRIMARY)
+  namn <- tolower(vy %||% '')
+  if (grepl('kvin', namn)) return(unname(KON_FARGER['Kvinnor']))
+  if (grepl('män|man', namn)) return(unname(KON_FARGER['Män']))
+  RD_ACCENT
+}
+
 mod_oversikt_ui <- function(id) {
   ns <- NS(id)
 
@@ -75,6 +90,24 @@ mod_oversikt_ui <- function(id) {
               h2('Andel sysselsatta per bransch'),
               div(class = 'rd-subtitle', textOutput(ns('jamforelse_underrubrik'), inline = TRUE)),
               girafeOutput(ns('plot_jamforelse'), height = '600px')
+          ),
+
+          div(class = 'rd-card',
+              h2('Sysselsatta per bransch'),
+              div(class = 'rd-subtitle', textOutput(ns('bransch_syss_underrubrik'), inline = TRUE)),
+              div(class = 'rd-sortering',
+                  span(class = 'rd-sortering__label', 'Visa:'),
+                  shinyWidgets::radioGroupButtons(ns('vy_val'), label = NULL,
+                                                  choices = c('Totalt' = VY_TOTALT),
+                                                  selected = VY_TOTALT, individual = TRUE, size = 'sm')),
+              div(class = 'rd-hint', 'Klicka på en bransch för att se utvecklingen över tid.'),
+              girafeOutput(ns('plot_bransch_sysselsatta'), height = 'auto')
+          ),
+
+          div(class = 'rd-card',
+              h2(textOutput(ns('tid_rubrik'), inline = TRUE)),
+              div(class = 'rd-subtitle', textOutput(ns('tid_underrubrik'), inline = TRUE)),
+              girafeOutput(ns('plot_sysselsatta_tid'), height = '320px')
           )
       )
   )
@@ -210,6 +243,76 @@ mod_oversikt_server <- function(id) {
         geo_namn       = geografi_namn(),
         underrubrik    = paste('\u00c5r', input$ar_val),
         kalla          = 'SCB (RAMS), bearbetat av Region Dalarna'
+      )
+    })
+
+    # ---- Sysselsatta per bransch (stapeldiagram, klickbart) + tidsserie --
+
+    shiny::observe({
+      kon <- hamta_kon_lista()
+      shinyWidgets::updateRadioGroupButtons(
+        session, 'vy_val',
+        choices  = c('Totalt' = VY_TOTALT, stats::setNames(kon, kon)),
+        selected = VY_TOTALT
+      )
+    })
+
+    bransch_sysselsatta <- shiny::reactive({
+      shiny::req(input$indelning_val, input$geografi_val, input$ar_val)
+      hamta_bransch_sysselsatta(
+        indelning_kolumn = input$indelning_val,
+        geografi          = input$geografi_val,
+        ar_val            = as.integer(input$ar_val),
+        totalt_varde      = VY_TOTALT
+      )
+    })
+
+    output$bransch_syss_underrubrik <- renderText({
+      shiny::req(input$geografi_val, input$ar_val)
+      paste0(geografi_namn(), ' \u00b7 \u00e5r ', input$ar_val)
+    })
+
+    output$plot_bransch_sysselsatta <- renderGirafe({
+      vy <- input$vy_val %||% VY_TOTALT
+      d <- bransch_sysselsatta() |> dplyr::filter(kon == vy)
+      skapa_diagram_bransch_sysselsatta(
+        d, klickad = klickad_bransch(), farg = .vy_farg(vy),
+        kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
+      )
+    })
+
+    # Branschen man senast klickat på i stapeldiagrammet ovan, för
+    # tidsseriediagrammet. NULL = visa totalt över tid (ingen bransch vald).
+    klickad_bransch <- shiny::reactiveVal(NULL)
+    shiny::observeEvent(input$plot_bransch_sysselsatta_selected, {
+      val <- input$plot_bransch_sysselsatta_selected
+      klickad_bransch(if (length(val) == 1 && nzchar(val)) val else NULL)
+    })
+    # Gruppnamnet hör till en viss indelning -- nollställ vid byte, annat
+    # branschnamn kan råka finnas i den nya indelningen också.
+    shiny::observeEvent(input$indelning_val, klickad_bransch(NULL), ignoreInit = TRUE)
+
+    output$tid_rubrik <- renderText({
+      b <- klickad_bransch()
+      if (is.null(b)) 'Sysselsatta totalt \u00f6ver tid'
+      else paste('Sysselsatta inom', b, '\u00f6ver tid')
+    })
+
+    output$tid_underrubrik <- renderText({
+      shiny::req(input$geografi_val)
+      if (is.null(klickad_bransch())) paste0(geografi_namn(), ' \u00b7 samtliga branscher')
+      else paste0(geografi_namn(), ' \u00b7 klicka p\u00e5 en annan stapel ovan f\u00f6r att byta bransch')
+    })
+
+    output$plot_sysselsatta_tid <- renderGirafe({
+      shiny::req(input$geografi_val, input$indelning_val)
+      b <- klickad_bransch()
+      branschkoder <- if (is.null(b)) NULL else hamta_branschkoder(input$indelning_val, b)
+      d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder)
+      skapa_diagram_sysselsatta_tid(
+        d,
+        underrubrik = if (is.null(b)) 'Alla branscher' else b,
+        kalla       = 'SCB (RAMS), bearbetat av Region Dalarna'
       )
     })
   })
