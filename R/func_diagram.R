@@ -245,3 +245,33 @@ skapa_diagram_sysselsatta_tid <- function(df, farg = RD_PRIMARY, rubrik = NULL,
 
   .girafe_std(g, width_svg = 9, height_svg = 4.2, selection = FALSE)
 }
+
+# ---- Linjediagram: utveckling av antal sysselsatta över tid, könsuppdelat --
+# Samma uppbyggnad som skapa_diagram_sysselsatta_tid(), men en linje per
+# kön (färg via .kon_farg_match(), legend högst upp) i stället för en enda
+# totallinje. df ska innehålla en kon-kolumn (se hamta_sysselsatta_tid()).
+skapa_diagram_sysselsatta_tid_kon <- function(df, rubrik = NULL, underrubrik = NULL, kalla = NULL) {
+  if (nrow(df) == 0 || all(is.na(df$antal))) {
+    return(.girafe_std(.tom_plot("Inga värden att visa"), height_svg = 1.5))
+  }
+  d <- df |>
+    dplyr::mutate(tooltip = paste0("<b>", ar, "</b><br/>", kon, ": ",
+                                   dplyr::if_else(is.na(antal), "Färre än 4",
+                                                  paste(scales::number(antal, big.mark = " "), "sysselsatta"))))
+
+  farger <- stats::setNames(vapply(unique(d$kon), .kon_farg_match, character(1)), unique(d$kon))
+
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = ar, y = antal, color = kon, group = kon)) +
+    ggplot2::geom_line(linewidth = 1, na.rm = TRUE) +
+    ggiraph::geom_point_interactive(ggplot2::aes(tooltip = tooltip), size = 2.2, na.rm = TRUE) +
+    ggplot2::scale_color_manual(values = farger, name = NULL) +
+    ggplot2::scale_x_continuous(breaks = scales::breaks_pretty()) +
+    ggplot2::scale_y_continuous(labels = scales::number_format(big.mark = " "),
+                                expand = ggplot2::expansion(mult = c(0.08, 0.1))) +
+    ggplot2::labs(x = NULL, y = NULL, title = rubrik, subtitle = underrubrik,
+                  caption = .kalltext(kalla)) +
+    .rd_tema() +
+    ggplot2::theme(legend.position = "top")
+
+  .girafe_std(g, width_svg = 9, height_svg = 4.2, selection = FALSE)
+}

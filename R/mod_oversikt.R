@@ -296,16 +296,27 @@ mod_oversikt_server <- function(id) {
       else paste0(geografi_namn(), ' \u00b7 klicka p\u00e5 en annan stapel ovan f\u00f6r att byta bransch')
     })
 
+    # Samma K\u00f6nsuppdelat/Totalt-l\u00e4ge som stapeldiagrammet ovan styr om
+    # tidsserien visas som en totallinje eller en linje per k\u00f6n.
     output$plot_sysselsatta_tid <- renderGirafe({
       shiny::req(input$geografi_val, input$indelning_val)
       b <- klickad_bransch()
       branschkoder <- if (is.null(b)) NULL else hamta_branschkoder(input$indelning_val, b)
-      d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder)
-      skapa_diagram_sysselsatta_tid(
-        d,
-        underrubrik = if (is.null(b)) 'Alla branscher' else b,
-        kalla       = 'SCB (RAMS), bearbetat av Region Dalarna'
-      )
+      underrubrik  <- if (is.null(b)) 'Alla branscher' else b
+      lage <- input$kon_lage %||% 'kon'
+      if (identical(lage, 'total')) {
+        d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder)
+        skapa_diagram_sysselsatta_tid(
+          d, underrubrik = underrubrik,
+          kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
+        )
+      } else {
+        d <- hamta_sysselsatta_tid(input$geografi_val, branschkoder, per_kon = TRUE)
+        skapa_diagram_sysselsatta_tid_kon(
+          d, underrubrik = underrubrik,
+          kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
+        )
+      }
     })
   })
 }

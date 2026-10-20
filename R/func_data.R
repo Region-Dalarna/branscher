@@ -203,16 +203,29 @@ hamta_total_etablerade <- function(geografi, ar_val, branschkoder = NULL) {
 # Antal sysselsatta per år, för en geografi -- hela urvalet
 # (branschkoder = NULL) eller en eller flera SNI-koder (t.ex. från
 # hamta_branschkoder()). Grund för tidsserien på Översikt när man
-# klickar på en stapel i "Sysselsatta per bransch".
-hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL) {
-  d <- hamta_syss_branscher() |>
-    dplyr::filter(matt == "sysselsatta", kommun_kod == geografi)
-  if (!is.null(branschkoder)) d <- dplyr::filter(d, branschkod %in% branschkoder)
-  d |>
-    dplyr::group_by(ar) |>
-    dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
-    dplyr::arrange(ar) |>
-    prick_smavarden(varde_kol = "antal")
+# klickar på en stapel i "Sysselsatta per bransch". per_kon = TRUE delar
+# upp på kön (en rad per år och kön) i stället för en totalrad per år --
+# håller tidsserien i synk med Könsuppdelat/Totalt-läget i stapeldiagrammet.
+hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL, per_kon = FALSE) {
+  if (per_kon) {
+    d <- hamta_syss_branscher_kon() |>
+      dplyr::filter(matt == "sysselsatta", kommun_kod == geografi)
+    if (!is.null(branschkoder)) d <- dplyr::filter(d, branschkod %in% branschkoder)
+    d |>
+      dplyr::group_by(ar, kon) |>
+      dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
+      dplyr::arrange(ar, kon) |>
+      prick_smavarden(varde_kol = "antal")
+  } else {
+    d <- hamta_syss_branscher() |>
+      dplyr::filter(matt == "sysselsatta", kommun_kod == geografi)
+    if (!is.null(branschkoder)) d <- dplyr::filter(d, branschkod %in% branschkoder)
+    d |>
+      dplyr::group_by(ar) |>
+      dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
+      dplyr::arrange(ar) |>
+      prick_smavarden(varde_kol = "antal")
+  }
 }
 
 # ---- Sysselsatta per bransch och kön (stapeldiagrammet på Översikt) ------
