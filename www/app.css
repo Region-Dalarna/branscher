@@ -157,6 +157,29 @@
   border-color: var(--rd-primary);
 }
 
+/* ---- Teckenförklaring ovanför ett diagram (t.ex. fylld stapel / ram) ----- */
+.rd-figurlegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 2px 0 10px;
+  font-size: 0.82rem;
+  color: var(--rd-text-muted);
+}
+.rd-figurlegend__item { display: inline-flex; align-items: center; gap: 6px; }
+.rd-figurlegend__swatch {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: var(--rd-radius-sm);
+  flex: none;
+}
+.rd-figurlegend__swatch--fylld { background: var(--rd-text-muted); }
+.rd-figurlegend__swatch--ram {
+  background: #fff;
+  border: 1.5px solid var(--rd-text);
+}
+
 /* ---- Nyckeltalskort: siffrorna på samma höjd ----------------------------- */
 /* Korten i en rad är lika höga (grid). Värdet (och ev. rad under) trycks
    ned i kortets nederkant, så att siffrorna linjerar även när en rubrik

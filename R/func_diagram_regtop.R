@@ -124,8 +124,11 @@ skapa_diagram_naringsgren_utveckling <- function(d, koder, basar, visa = c("inde
 }
 
 # ---- Arbetskraften per ålder och kön (pyramid), länet ----------------------
-# d = hamta_arbetskraft_prognos(). Fyllda staplar = valt år, ram =
-# basåret. Kvinnor till vänster, män till höger.
+# d = hamta_arbetskraft_prognos(). Fyllda staplar = basåret (sista
+# historiska året), ram = valt prognosår. Kvinnor till vänster, män till
+# höger. Teckenförklaringen för fylld/ram byggs av anroparen (se
+# mod_prognos.R) -- diagrammet själv förklarar bara könen (text ovanför
+# staplarna).
 skapa_diagram_arbetskraft_pyramid <- function(d, basar, ar_val, underrubrik = NULL, kalla = NULL) {
   dd <- d |>
     dplyr::filter(regionkod == REGTOP_LAN, ar %in% c(basar, ar_val)) |>
@@ -143,10 +146,10 @@ skapa_diagram_arbetskraft_pyramid <- function(d, basar, ar_val, underrubrik = NU
 
   g <- ggplot2::ggplot(dd, ggplot2::aes(y = alder)) +
     ggiraph::geom_col_interactive(
-      ggplot2::aes(x = tecken * varde, fill = kon, tooltip = tooltip, data_id = paste(kon, alder)),
+      ggplot2::aes(x = tecken * bas, fill = kon, tooltip = tooltip, data_id = paste(kon, alder)),
       width = 0.75
     ) +
-    ggplot2::geom_col(ggplot2::aes(x = tecken * bas), fill = NA, color = RD_TEXT,
+    ggplot2::geom_col(ggplot2::aes(x = tecken * varde), fill = NA, color = RD_TEXT,
                       linewidth = 0.5, width = 0.75) +
     ggplot2::geom_vline(xintercept = 0, color = "white", linewidth = 1) +
     ggplot2::annotate("text", x = -maxv, y = Inf, label = "Kvinnor", hjust = 0, vjust = 1.4,

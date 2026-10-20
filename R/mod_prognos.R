@@ -81,9 +81,8 @@ mod_prognos_ui <- function(id) {
 
           div(class = 'rd-card',
               h2(textOutput(ns('rubrik_arbetskraft'), inline = TRUE)),
-              div(class = 'rd-subtitle',
-                  'Arbetskraften i Dalarnas län per ålder och kön. Fyllda staplar = valt ',
-                  'prognosår, ram = sista historiska året.'),
+              div(class = 'rd-subtitle', 'Arbetskraften i Dalarnas län per ålder och kön.'),
+              uiOutput(ns('arbetskraft_legend')),
               girafeOutput(ns('plot_arbetskraft'), height = 'auto')),
 
           tags$details(class = 'rd-card rd-fotnoter',
@@ -155,10 +154,23 @@ mod_prognos_server <- function(id, aktiv = shiny::reactive(TRUE)) {
         kalla = REGTOP_KALLA)
     )
 
+    # Teckenförklaring för fylld stapel / ram -- se skapa_diagram_arbetskraft_pyramid()
+    # i func_diagram_regtop.R för vilken data som faktiskt ritas som vad.
+    output$arbetskraft_legend <- renderUI({
+      shiny::req(basar(), ar_val())
+      div(class = 'rd-figurlegend',
+          div(class = 'rd-figurlegend__item',
+              span(class = 'rd-figurlegend__swatch rd-figurlegend__swatch--fylld'),
+              paste('Sista historiska året,', basar())),
+          div(class = 'rd-figurlegend__item',
+              span(class = 'rd-figurlegend__swatch rd-figurlegend__swatch--ram'),
+              paste('Valt prognosår,', ar_val())))
+    })
+
     output$plot_arbetskraft <- renderGirafe(
       skapa_diagram_arbetskraft_pyramid(
         arbetskraft(), basar(), ar_val(),
-        underrubrik = paste('Dalarnas län ·', basar(), '(ram) och', ar_val(), '(fylld)'),
+        underrubrik = 'Dalarnas län',
         kalla = REGTOP_KALLA)
     )
 
