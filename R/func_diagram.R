@@ -59,7 +59,7 @@
 # ---- Lollipop: andel sysselsatta per bransch, tre geografinivåer --------
 # (vald geografi / länet / riket -- samma grundidé som inspirationsbilderna
 # i önskemålsdokumentet, utökad med tre jämförelsepunkter per bransch.)
-skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "",
+skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "", geo_namn = "Vald geografi",
                                              rubrik = NULL, underrubrik = NULL,
                                              kalla = NULL) {
   d <- df |>
@@ -69,7 +69,7 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "",
     dplyr::mutate(
       geo_niva_etikett = factor(geo_niva,
                                 levels = c("riket", "lan", "vald"),
-                                labels = c("Riket", "L\u00e4net", "Vald geografi")
+                                labels = c("Riket", "L\u00e4net", geo_namn)
       ),
       markerad = grupp_namn %in% markerad_grupp
     )
@@ -92,10 +92,9 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "",
         data_id = paste(grupp_namn, geo_niva_etikett)
       )
     ) +
-    ggplot2::scale_color_manual(values = c(
-      "Riket"          = RD_TEXT_MUTED,
-      "L\u00e4net"     = RD_ACCENT,
-      "Vald geografi"  = RD_PRIMARY
+    ggplot2::scale_color_manual(values = stats::setNames(
+      c(RD_TEXT_MUTED, RD_ACCENT, RD_PRIMARY),
+      c("Riket", "L\u00e4net", geo_namn)
     ), name = NULL) +
     ggplot2::scale_size_identity() +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),

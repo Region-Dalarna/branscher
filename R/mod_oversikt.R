@@ -140,6 +140,17 @@ mod_oversikt_server <- function(id) {
 
     valda_branscher <- shiny::reactive(setdiff(input$bransch_val, ALLA_BRANSCHER))
 
+    # Namnet på vald geografisk nivå, för legend/tooltip i jämförelsediagrammet
+    # ("Vald geografi" → t.ex. kommunnamnet eller "Hela Dalarna (länet)").
+    geografi_namn <- shiny::reactive({
+      shiny::req(input$geografi_val)
+      if (input$geografi_val == '20') 'Hela Dalarna (länet)'
+      else {
+        namn <- kommuner$kommun_namn[match(input$geografi_val, kommuner$kommun_kod)]
+        if (is.na(namn)) 'Vald geografi' else namn
+      }
+    })
+
     branschkoder <- shiny::reactive({
       shiny::req(input$indelning_val)
       hamta_branschkoder(input$indelning_val, valda_branscher())
@@ -190,6 +201,7 @@ mod_oversikt_server <- function(id) {
       skapa_diagram_bransch_jamforelse(
         df             = data_oversikt(),
         markerad_grupp = valda_branscher(),
+        geo_namn       = geografi_namn(),
         underrubrik    = paste('\u00c5r', input$ar_val),
         kalla          = 'SCB (RAMS), bearbetat av Region Dalarna'
       )
