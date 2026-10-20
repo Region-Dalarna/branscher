@@ -69,7 +69,7 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "", geo_namn =
     dplyr::mutate(
       geo_niva_etikett = factor(geo_niva,
                                 levels = c("riket", "lan", "vald"),
-                                labels = c("Riket", "L\u00e4net", geo_namn)
+                                labels = c("Riket", "Dalarna", geo_namn)
       ),
       markerad = grupp_namn %in% markerad_grupp
     )
@@ -97,7 +97,7 @@ skapa_diagram_bransch_jamforelse <- function(df, markerad_grupp = "", geo_namn =
     ) +
     ggplot2::scale_color_manual(values = stats::setNames(
       c(RD_TEXT_MUTED, RD_ACCENT, RD_PRIMARY),
-      c("Riket", "L\u00e4net", geo_namn)
+      c("Riket", "Dalarna", geo_namn)
     ), name = NULL) +
     ggplot2::scale_size_identity() +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1),

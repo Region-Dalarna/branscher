@@ -199,8 +199,8 @@ mod_oversikt_server <- function(id) {
 
     output$jamforelse_underrubrik <- renderText({
       shiny::req(input$geografi_val)
-      if (input$geografi_val == LAN_KOD_DALARNA) 'Länet (Dalarna) och riket'
-      else paste0(geografi_namn(), ', länet (Dalarna) och riket')
+      if (input$geografi_val == LAN_KOD_DALARNA) 'Dalarna och riket'
+      else paste0(geografi_namn(), ', Dalarna och riket')
     })
 
     output$plot_jamforelse <- renderGirafe({
