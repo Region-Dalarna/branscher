@@ -30,26 +30,31 @@ mod_demografi_ui <- function(id) {
         span(class = 'rd-sortering__label', 'Sortera efter andel:'),
         kontroll)
   }
+  # Vanligt klick väljer bara den åldersgruppen; Ctrl/⌘ + klick lägger
+  # till eller tar bort den ur urvalet (se knapparnas klick-JS nedan).
   knappar_flera <- function(input_id) {
-    shinyWidgets::checkboxGroupButtons(ns(input_id), label = NULL, choices = character(0),
-                                       individual = TRUE, size = 'sm')
+    div(class = 'rd-alder-ctrl',
+        shinyWidgets::checkboxGroupButtons(ns(input_id), label = NULL, choices = character(0),
+                                           individual = TRUE, size = 'sm'))
   }
   knappar_en <- function(input_id, choices, selected) {
     shinyWidgets::radioGroupButtons(ns(input_id), label = NULL, choices = choices,
                                     selected = selected, individual = TRUE, size = 'sm')
   }
-  kort <- function(rubrik, underrubrik, kontroll, output_id) {
+  kort <- function(rubrik, underrubrik, kontroll, output_id, hint = NULL) {
     div(class = 'rd-card',
         h2(rubrik),
         div(class = 'rd-subtitle', underrubrik),
         sortering(kontroll),
+        if (!is.null(hint)) div(class = 'rd-hint', hint),
         girafeOutput(ns(output_id), height = 'auto'))
   }
   diagram <- function(enhet, enheter_txt, suffix) {
     tagList(
       kort(paste('Ålder per', enhet), enheter_txt,
            knappar_flera(paste0('sort_alder_', suffix)),
-           paste0('plot_alder_', suffix)),
+           paste0('plot_alder_', suffix),
+           hint = 'Håll ned Ctrl (⌘ på Mac) och klicka för att välja flera åldersgrupper.'),
       kort(paste('Kön per', enhet), enheter_txt,
            knappar_en(paste0('sort_kon_', suffix), KON_VAL, 'Kvinna'),
            paste0('plot_kon_', suffix)),
@@ -59,34 +64,63 @@ mod_demografi_ui <- function(id) {
     )
   }
 
-  div(class = 'rd-app',
-      mod_urval_yrke_ui(ns('urval')),
+  tagList(
+    div(class = 'rd-app',
+        mod_urval_yrke_ui(ns('urval')),
 
-      div(class = 'rd-main',
-          div(class = 'rd-kpi-row',
-              rd_kpi(textOutput(ns('etikett_alder'), inline = TRUE), textOutput(ns('box_alder')),
-                     textOutput(ns('forklaring_alder'), inline = TRUE)),
-              rd_kpi(textOutput(ns('etikett_kon'), inline = TRUE), textOutput(ns('box_kon')),
-                     textOutput(ns('forklaring_kon'), inline = TRUE)),
-              rd_kpi(textOutput(ns('etikett_bakgrund'), inline = TRUE), textOutput(ns('box_bakgrund')),
-                     textOutput(ns('forklaring_bakgrund'), inline = TRUE))),
+        div(class = 'rd-main',
+            div(class = 'rd-kpi-row',
+                rd_kpi(textOutput(ns('etikett_alder'), inline = TRUE), textOutput(ns('box_alder')),
+                       textOutput(ns('forklaring_alder'), inline = TRUE)),
+                rd_kpi(textOutput(ns('etikett_kon'), inline = TRUE), textOutput(ns('box_kon')),
+                       textOutput(ns('forklaring_kon'), inline = TRUE)),
+                rd_kpi(textOutput(ns('etikett_bakgrund'), inline = TRUE), textOutput(ns('box_bakgrund')),
+                       textOutput(ns('forklaring_bakgrund'), inline = TRUE))),
 
-          tabsetPanel(
-            id = ns('underflik'),
-            tabPanel('Branscher',
-                     diagram('bransch',
-                             'Alla branscher i vald branschindelning (vald bransch framhävs).',
-                             'bransch')),
-            tabPanel('Yrken',
-                     yrkesval_ui(ns, 'S\u00f6k och l\u00e4gg till yrken i diagrammen\u2026',
-                                 class = 'rd-yrkesval--underflik'),
-                     diagram('yrke',
-                             paste('De 20 största yrkena i urvalet. Yrken du lägger till ovan',
-                                   'framhävs och ersätter de minsta \u2013 eller visas ensamma med',
-                                   '\u201cVisa bara valda yrken\u201d.'),
-                             'yrke'))
-          )
-      )
+            tabsetPanel(
+              id = ns('underflik'),
+              tabPanel('Branscher',
+                       diagram('bransch',
+                               'Alla branscher i vald branschindelning (vald bransch framhävs).',
+                               'bransch')),
+              tabPanel('Yrken',
+                       yrkesval_ui(ns, 'Sök och lägg till yrken i diagrammen…',
+                                   class = 'rd-yrkesval--underflik'),
+                       diagram('yrke',
+                               paste('De 20 största yrkena i urvalet. Yrken du lägger till ovan',
+                                     'framhävs och ersätter de minsta – eller visas ensamma med',
+                                     '“Visa bara valda yrken”.'),
+                               'yrke'))
+            )
+        )
+    ),
+    # Åldersknapparna (.rd-alder-ctrl): vanligt klick väljer bara den
+    # klickade knappen (ersätter urvalet); Ctrl/⌘ + klick växlar bara den
+    # (lägger till/tar bort, Bootstraps standardbeteende för knapprader).
+    # Fångas i capture-fasen och stoppas där (stopPropagation) innan
+    # Bootstraps egen klickhanterare hinner köra sin vanliga
+    # växla-bara-den-här-logik -- annars vore "ersätt urvalet" omöjligt
+    # att uttrycka. Ändringen speglas till shinyWidgets genom att trigga
+    # "change" på kryssrutan, som dess input-binding redan lyssnar på.
+    tags$script(HTML(
+      "if (!window.rdAlderCtrlInit) {
+         window.rdAlderCtrlInit = true;
+         document.addEventListener('click', function(e) {
+           var knapp = e.target.closest('.rd-alder-ctrl .checkbtn');
+           if (!knapp || e.ctrlKey || e.metaKey) return;
+           var cb = knapp.querySelector('input[type=checkbox]');
+           if (!cb) return;
+           e.preventDefault();
+           e.stopPropagation();
+           var grupp = knapp.closest('.checkbox-group-buttons');
+           grupp.querySelectorAll('input[type=checkbox]').forEach(function(annan) {
+             annan.checked = (annan === cb);
+             annan.closest('.checkbtn').classList.toggle('active', annan === cb);
+           });
+           cb.dispatchEvent(new Event('change', {bubbles: true}));
+         }, true);
+       }"
+    ))
   )
 }
 
@@ -219,7 +253,7 @@ mod_demografi_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     fordelning <- function(profil, n, markerad, underrubrik, kat_kol, kat, farger, sortera, sort_txt,
                            enheter = NULL) {
       if (n == 0 && length(enheter) == 0) {
-        return(.girafe_std(.tom_plot('L\u00e4gg till yrken i s\u00f6krutan ovan'), height_svg = 1.5))
+        return(.girafe_std(.tom_plot('Lägg till yrken i sökrutan ovan'), height_svg = 1.5))
       }
       skapa_diagram_fordelning(
         fordelning_per_enhet(profil, kat_kol, n = n, enheter = enheter), kat, farger,
