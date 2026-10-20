@@ -219,9 +219,9 @@ hamta_sysselsatta_tid <- function(geografi, branschkoder = NULL) {
 #
 # Till skillnad från hamta_syss_branscher() (som medvetet summerar bort
 # kön/ålder/bakgrund redan i databasen) behåller denna frågan kön, för
-# att kunna visa "Totalt"/"Kvinnor"/"Män" som egna vyer. Könsvärdena
-# läses ur källdatan (hamta_kon_lista()) i stället för att antas, eftersom
-# de exakta textsträngarna i mikro_db.syss_branscher inte är bekräftade.
+# att kunna visa ett könsuppdelat stapeldiagram. De exakta textsträngarna
+# i mikro_db.syss_branscher (kon-kolumnen) är inte bekräftade, så övriga
+# kod läser kön-värdena direkt ur resultatet i stället för att anta dem.
 
 .syss_kon_cache <- new.env(parent = emptyenv())
 
@@ -248,11 +248,6 @@ hamta_syss_branscher_kon <- function(force = FALSE) {
     .syss_kon_cache$df <- rensa_syss_branscher_kon(rad)
   }
   .syss_kon_cache$df
-}
-
-# Könsvärden som faktiskt förekommer i källdatan, för väljaren i UI:t.
-hamta_kon_lista <- function() {
-  sort(unique(hamta_syss_branscher_kon()$kon))
 }
 
 # Antal sysselsatta per bransch (i vald indelning), uppdelat på kön samt

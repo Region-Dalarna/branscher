@@ -138,6 +138,25 @@
   color: var(--rd-text-muted);
 }
 
+/* ---- Könskontroll under stapeln (Könsuppdelat/Totalt) -------------------- */
+.rd-kon-kontroll { margin-top: 12px; text-align: center; }
+.rd-kon-kontroll .btn-group-container-sw { display: inline-flex; gap: 6px; }
+.rd-kon-kontroll .radiobtn {
+  border: 1px solid var(--rd-border);
+  background: #fff;
+  color: var(--rd-text-muted);
+  border-radius: var(--rd-radius-sm) !important;
+  font-weight: 500;
+  padding: 5px 14px;
+  font-size: 0.82rem;
+}
+.rd-kon-kontroll .radiobtn.active,
+.rd-kon-kontroll .radiobtn.active:hover {
+  background: var(--rd-primary);
+  color: #fff;
+  border-color: var(--rd-primary);
+}
+
 /* ---- Nyckeltalskort: siffrorna på samma höjd ----------------------------- */
 /* Korten i en rad är lika höga (grid). Värdet (och ev. rad under) trycks
    ned i kortets nederkant, så att siffrorna linjerar även när en rubrik

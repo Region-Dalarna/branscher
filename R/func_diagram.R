@@ -167,6 +167,79 @@ skapa_diagram_bransch_sysselsatta <- function(df, klickad = NULL, farg = RD_PRIM
               selection = TRUE)
 }
 
+# Könsfärg utifrån den faktiska textsträngen i källdatan (okänd exakt
+# stavning/skiftläge, se func_data.R) -- case-okänslig delmatchning mot
+# KON_FARGER, annars accentfärgen.
+.kon_farg_match <- function(namn) {
+  n <- tolower(namn %||% "")
+  if (grepl("kvin", n)) return(unname(KON_FARGER["Kvinnor"]))
+  if (grepl("män|man", n)) return(unname(KON_FARGER["Män"]))
+  RD_ACCENT
+}
+
+# ---- Stapeldiagram: antal sysselsatta per bransch, könsuppdelat (staplad) --
+# Samma klick-/sekretessmönster som skapa_diagram_bransch_sysselsatta(), men
+# staplad per kön (fyllningsfärg) i stället för en enfärgad stapel. df ska
+# bara innehålla kön-raderna (Totalt-raden filtreras bort av anroparen).
+skapa_diagram_bransch_sysselsatta_kon <- function(df, klickad = NULL,
+                                                  rubrik = NULL, underrubrik = NULL,
+                                                  kalla = NULL) {
+  if (nrow(df) == 0) {
+    return(.girafe_std(.tom_plot("Inga värden att visa"), height_svg = 1.5))
+  }
+  ordning <- df |>
+    dplyr::group_by(grupp_namn) |>
+    dplyr::summarise(tot = sum(dplyr::coalesce(antal, 0), na.rm = TRUE), .groups = "drop") |>
+    dplyr::arrange(dplyr::desc(tot)) |>
+    dplyr::pull(grupp_namn)
+  niv <- rev(ordning)
+
+  d <- df |>
+    dplyr::mutate(
+      grupp_namn = factor(grupp_namn, levels = niv),
+      dold       = is.na(antal),
+      antal_vy   = dplyr::if_else(dold, 0, antal),
+      tooltip    = dplyr::if_else(
+        dold,
+        paste0("<b>", grupp_namn, "</b><br/>", kon, ": Färre än 4 (redovisas inte av sekretesskäl)"),
+        paste0("<b>", grupp_namn, "</b><br/>", kon, ": ", scales::number(antal, big.mark = " "))
+      )
+    )
+
+  rand <- intersect(as.character(klickad), as.character(d$grupp_namn))
+  farger <- stats::setNames(vapply(unique(d$kon), .kon_farg_match, character(1)), unique(d$kon))
+
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn, fill = kon, group = kon))
+  if (length(rand) > 0) {
+    max_x <- d |>
+      dplyr::group_by(grupp_namn) |>
+      dplyr::summarise(s = sum(antal_vy), .groups = "drop") |>
+      dplyr::pull(s) |>
+      max()
+    g <- g + ggplot2::geom_tile(
+      data = data.frame(grupp_namn = factor(rand, levels = niv)),
+      ggplot2::aes(x = max_x * 0.52, y = grupp_namn),
+      width = max_x * 1.04, height = 0.96, fill = "#d6ebf2",
+      inherit.aes = FALSE
+    )
+  }
+  g <- g +
+    ggiraph::geom_col_interactive(
+      ggplot2::aes(tooltip = tooltip, data_id = grupp_namn),
+      width = 0.72
+    ) +
+    ggplot2::scale_fill_manual(values = farger, name = NULL) +
+    ggplot2::scale_x_continuous(labels = scales::number_format(big.mark = " "),
+                                expand = ggplot2::expansion(mult = c(0, 0.04))) +
+    ggplot2::labs(x = NULL, y = NULL, title = rubrik, subtitle = underrubrik,
+                  caption = .kalltext(kalla)) +
+    .rd_tema() +
+    ggplot2::theme(legend.position = "top")
+
+  .girafe_std(g, width_svg = 9, height_svg = max(5, dplyr::n_distinct(d$grupp_namn) * 0.38 + 1.5),
+              selection = TRUE)
+}
+
 # ---- Linjediagram: utveckling av antal sysselsatta över tid --------------
 skapa_diagram_sysselsatta_tid <- function(df, farg = RD_PRIMARY, rubrik = NULL,
                                           underrubrik = NULL, kalla = NULL) {

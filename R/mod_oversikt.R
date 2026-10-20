@@ -17,20 +17,11 @@
 # Värdet för "Alla branscher" i branschväljaren.
 ALLA_BRANSCHER <- '__alla__'
 
-# Värdet för "Totalt" (båda könen) i vy-väljaren för stapeldiagrammet
-# "Sysselsatta per bransch". De övriga valen fylls i vid körning med de
-# könsvärden som faktiskt finns i källdatan (hamta_kon_lista()).
+# Värdet för "Totalt"-raden (båda könen, beräknad) i resultatet från
+# hamta_bransch_sysselsatta() -- se func_data.R. Används för att plocka ut
+# totalraden resp. de riktiga kön-raderna för stapeldiagrammet
+# "Sysselsatta per bransch".
 VY_TOTALT <- '__totalt__'
-
-# Färg för vy-väljarens stapeldiagram: "Totalt" = primärfärgen, kön som
-# matchar "kvin.../män/man" i KON_FARGER, annat okänt värde = accentfärg.
-.vy_farg <- function(vy) {
-  if (identical(vy, VY_TOTALT)) return(RD_PRIMARY)
-  namn <- tolower(vy %||% '')
-  if (grepl('kvin', namn)) return(unname(KON_FARGER['Kvinnor']))
-  if (grepl('män|man', namn)) return(unname(KON_FARGER['Män']))
-  RD_ACCENT
-}
 
 mod_oversikt_ui <- function(id) {
   ns <- NS(id)
@@ -95,13 +86,12 @@ mod_oversikt_ui <- function(id) {
           div(class = 'rd-card',
               h2('Sysselsatta per bransch'),
               div(class = 'rd-subtitle', textOutput(ns('bransch_syss_underrubrik'), inline = TRUE)),
-              div(class = 'rd-sortering',
-                  span(class = 'rd-sortering__label', 'Visa:'),
-                  shinyWidgets::radioGroupButtons(ns('vy_val'), label = NULL,
-                                                  choices = c('Totalt' = VY_TOTALT),
-                                                  selected = VY_TOTALT, individual = TRUE, size = 'sm')),
+              girafeOutput(ns('plot_bransch_sysselsatta'), height = 'auto'),
               div(class = 'rd-hint', 'Klicka på en bransch för att se utvecklingen över tid.'),
-              girafeOutput(ns('plot_bransch_sysselsatta'), height = 'auto')
+              div(class = 'rd-kon-kontroll',
+                  shinyWidgets::radioGroupButtons(ns('kon_lage'), label = NULL,
+                                                  choices  = c('Könsuppdelat' = 'kon', 'Totalt' = 'total'),
+                                                  selected = 'kon', size = 'sm'))
           ),
 
           div(class = 'rd-card',
@@ -248,15 +238,6 @@ mod_oversikt_server <- function(id) {
 
     # ---- Sysselsatta per bransch (stapeldiagram, klickbart) + tidsserie --
 
-    shiny::observe({
-      kon <- hamta_kon_lista()
-      shinyWidgets::updateRadioGroupButtons(
-        session, 'vy_val',
-        choices  = c('Totalt' = VY_TOTALT, stats::setNames(kon, kon)),
-        selected = VY_TOTALT
-      )
-    })
-
     bransch_sysselsatta <- shiny::reactive({
       shiny::req(input$indelning_val, input$geografi_val, input$ar_val)
       hamta_bransch_sysselsatta(
@@ -273,12 +254,20 @@ mod_oversikt_server <- function(id) {
     })
 
     output$plot_bransch_sysselsatta <- renderGirafe({
-      vy <- input$vy_val %||% VY_TOTALT
-      d <- bransch_sysselsatta() |> dplyr::filter(kon == vy)
-      skapa_diagram_bransch_sysselsatta(
-        d, klickad = klickad_bransch(), farg = .vy_farg(vy),
-        kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
-      )
+      lage <- input$kon_lage %||% 'kon'
+      if (identical(lage, 'total')) {
+        d <- bransch_sysselsatta() |> dplyr::filter(kon == VY_TOTALT)
+        skapa_diagram_bransch_sysselsatta(
+          d, klickad = klickad_bransch(), farg = RD_PRIMARY,
+          kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
+        )
+      } else {
+        d <- bransch_sysselsatta() |> dplyr::filter(kon != VY_TOTALT)
+        skapa_diagram_bransch_sysselsatta_kon(
+          d, klickad = klickad_bransch(),
+          kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
+        )
+      }
     })
 
     # Branschen man senast klickat på i stapeldiagrammet ovan, för
