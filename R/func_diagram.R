@@ -40,7 +40,11 @@
 }
 
 # Standardiserad girafe. selection = TRUE ger klickbar korsfiltrering.
-.girafe_std <- function(g, width_svg = 9, height_svg = 6, selection = FALSE) {
+# selected: data_id (som text) för det element som ska visas som valt redan
+# vid render -- ggiraph ritar då själv en kant (RD_SELECT_CSS) runt just
+# det elementet, utan att diagrammet behöver rita en egen markering.
+.girafe_std <- function(g, width_svg = 9, height_svg = 6, selection = FALSE,
+                        selected = character(0)) {
   opts <- list(
     ggiraph::opts_hover(css = RD_HOVER_CSS),
     ggiraph::opts_tooltip(css = RD_TOOLTIP_CSS),
@@ -50,7 +54,7 @@
   )
   if (selection) {
     opts <- c(opts, list(ggiraph::opts_selection(
-      type = "single", only_shiny = TRUE, css = RD_SELECT_CSS)))
+      type = "single", only_shiny = TRUE, css = RD_SELECT_CSS, selected = selected)))
   }
   ggiraph::girafe(ggobj = g, width_svg = width_svg, height_svg = height_svg,
                   options = opts)
@@ -143,16 +147,7 @@ skapa_diagram_bransch_sysselsatta <- function(df, klickad = NULL, farg = RD_PRIM
 
   rand <- intersect(as.character(klickad), as.character(d$grupp_namn))
 
-  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn))
-  if (length(rand) > 0) {
-    g <- g + ggplot2::geom_tile(
-      data = data.frame(grupp_namn = factor(rand, levels = niv)),
-      ggplot2::aes(x = max(d$antal_vy) * 0.52, y = grupp_namn),
-      width = max(d$antal_vy) * 1.04, height = 0.96, fill = "#d6ebf2",
-      inherit.aes = FALSE
-    )
-  }
-  g <- g +
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn)) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(tooltip = tooltip, data_id = grupp_namn),
       fill = farg, width = 0.72
@@ -164,7 +159,7 @@ skapa_diagram_bransch_sysselsatta <- function(df, klickad = NULL, farg = RD_PRIM
     .rd_tema()
 
   .girafe_std(g, width_svg = 9, height_svg = max(5, dplyr::n_distinct(d$grupp_namn) * 0.38 + 1.5),
-              selection = TRUE)
+              selection = TRUE, selected = rand)
 }
 
 # Könsfärg utifrån den faktiska textsträngen i källdatan (okänd exakt
@@ -209,21 +204,7 @@ skapa_diagram_bransch_sysselsatta_kon <- function(df, klickad = NULL,
   rand <- intersect(as.character(klickad), as.character(d$grupp_namn))
   farger <- stats::setNames(vapply(unique(d$kon), .kon_farg_match, character(1)), unique(d$kon))
 
-  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn, fill = kon, group = kon))
-  if (length(rand) > 0) {
-    max_x <- d |>
-      dplyr::group_by(grupp_namn) |>
-      dplyr::summarise(s = sum(antal_vy), .groups = "drop") |>
-      dplyr::pull(s) |>
-      max()
-    g <- g + ggplot2::geom_tile(
-      data = data.frame(grupp_namn = factor(rand, levels = niv)),
-      ggplot2::aes(x = max_x * 0.52, y = grupp_namn),
-      width = max_x * 1.04, height = 0.96, fill = "#d6ebf2",
-      inherit.aes = FALSE
-    )
-  }
-  g <- g +
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = grupp_namn, fill = kon, group = kon)) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(tooltip = tooltip, data_id = grupp_namn),
       width = 0.72
@@ -237,7 +218,7 @@ skapa_diagram_bransch_sysselsatta_kon <- function(df, klickad = NULL,
     ggplot2::theme(legend.position = "top")
 
   .girafe_std(g, width_svg = 9, height_svg = max(5, dplyr::n_distinct(d$grupp_namn) * 0.38 + 1.5),
-              selection = TRUE)
+              selection = TRUE, selected = rand)
 }
 
 # ---- Linjediagram: utveckling av antal sysselsatta över tid --------------

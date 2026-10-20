@@ -272,8 +272,11 @@ mod_oversikt_server <- function(id) {
 
     # Branschen man senast klickat på i stapeldiagrammet ovan, för
     # tidsseriediagrammet. NULL = visa totalt över tid (ingen bransch vald).
+    # ggiraph avmarkerar (type = "single") om man klickar på samma stapel
+    # igen och skickar då en tom vektor -- som Shiny gör om till NULL, så
+    # ignoreNULL = FALSE krävs för att observern ska reagera på det också.
     klickad_bransch <- shiny::reactiveVal(NULL)
-    shiny::observeEvent(input$plot_bransch_sysselsatta_selected, {
+    shiny::observeEvent(input$plot_bransch_sysselsatta_selected, ignoreNULL = FALSE, {
       val <- input$plot_bransch_sysselsatta_selected
       klickad_bransch(if (length(val) == 1 && nzchar(val)) val else NULL)
     })
