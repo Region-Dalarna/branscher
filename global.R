@@ -20,6 +20,9 @@ library(ggiraph)
 source("https://raw.githubusercontent.com/Region-Dalarna/funktioner/main/func_shinyappar.R",
        encoding = "utf-8", echo = FALSE)
 
+# ---- Telemetri (användningsstatistik, se Adminportalen) --------------------
+telemetry <- skapa_telemetry("branscher")
+
 # ---- Lokala filer ----------------------------------------------------------
 # Hjälp- och modulfiler i R/ laddas AUTOMATISKT av Shiny (>= 1.5.0), i
 # bokstavsordning och efter denna fil. Inga source()-rader behövs här.

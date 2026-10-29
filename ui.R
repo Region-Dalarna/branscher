@@ -8,7 +8,8 @@ shinyUI(
       tags$link(rel = 'stylesheet', type = 'text/css', href = 'tippy.css'),
       tags$script(src = 'popper.min.js'),
       tags$script(src = 'tippy-bundle.umd.min.js'),
-      tags$script(src = 'tooltips.js')
+      tags$script(src = 'tooltips.js'),
+      telemetri_ui(telemetry)
     ),
 
     # ---- Header (full bredd via app.css) ---------------------------------
