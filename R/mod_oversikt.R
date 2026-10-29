@@ -49,7 +49,12 @@ mod_oversikt_ui <- function(id) {
 
           div(class = 'rd-info',
               tags$strong('OBS: '),
-              'V\u00e4rden under 4 visas som \u201cF\u00e4rre \u00e4n 4\u201d av sekretessk\u00e4l.')
+              'V\u00e4rden under 4 visas som \u201cF\u00e4rre \u00e4n 4\u201d av sekretessk\u00e4l.'),
+
+          div(style = 'margin-top: 12px;',
+              actionButton(ns('kopiera_lank'), 'Kopiera l\u00e4nk till denna vy',
+                          icon = bsicons::bs_icon('link-45deg'),
+                          class = 'rd-btn rd-btn--ghost'))
       ),
 
       div(class = 'rd-main',
@@ -105,7 +110,7 @@ mod_oversikt_ui <- function(id) {
   )
 }
 
-mod_oversikt_server <- function(id) {
+mod_oversikt_server <- function(id, lank = list()) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -113,21 +118,33 @@ mod_oversikt_server <- function(id) {
     kommuner    <- hamta_kommuner()
     ar_lista    <- hamta_ar_lista()
 
+    # ---- Djuplänkning: föredra värden från query-strängen (lank) om de
+    # finns och är giltiga, annars ordinarie standardval.
     shiny::observe({
-      updateSelectInput(session, 'ar_val',
-                        choices = ar_lista, selected = ar_lista[1])
+      sel <- if (!is.null(lank$ar) && lank$ar %in% ar_lista) lank$ar else ar_lista[1]
+      updateSelectInput(session, 'ar_val', choices = ar_lista, selected = sel)
     })
 
     shiny::observe({
-      updateSelectInput(session, 'indelning_val',
-                        choices  = stats::setNames(indelningar$kolumn, indelningar$namn),
-                        selected = 'grupp_benamning')  # bransch_20 saknar värden i källdata -- se func_data.R
+      indelning_val_choices <- stats::setNames(indelningar$kolumn, indelningar$namn)
+      sel <- if (!is.null(lank$indelning) && lank$indelning %in% indelning_val_choices) lank$indelning
+             else 'grupp_benamning'  # bransch_20 saknar värden i källdata -- se func_data.R
+      updateSelectInput(session, 'indelning_val', choices = indelning_val_choices, selected = sel)
     })
 
     shiny::observe({
-      updateSelectInput(session, 'geografi_val',
-                        choices = c('Hela Dalarna (l\u00e4net)' = '20',
-                                    stats::setNames(kommuner$kommun_kod, kommuner$kommun_namn)))
+      geografi_val_choices <- c('Hela Dalarna (l\u00e4net)' = '20',
+                                stats::setNames(kommuner$kommun_kod, kommuner$kommun_namn))
+      sel <- if (!is.null(lank$geografi) && lank$geografi %in% geografi_val_choices) lank$geografi else NULL
+      updateSelectInput(session, 'geografi_val', choices = geografi_val_choices, selected = sel)
+    })
+
+    # dim_lage (Könsuppdelat/Inrikes-utrikes födda/Totalt) sätts redan i UI:n
+    # (selected = 'kon'); byt bara om länken anger ett giltigt läge.
+    shiny::observe({
+      if (!is.null(lank$dim_lage) && lank$dim_lage %in% c('kon', 'bakgrund', 'total')) {
+        shinyWidgets::updateRadioGroupButtons(session, 'dim_lage', selected = lank$dim_lage)
+      }
     })
 
     grupper_i_indelning <- shiny::reactive({
@@ -140,13 +157,24 @@ mod_oversikt_server <- function(id) {
     # bransch försvinner "Alla branscher", väljs "Alla branscher" (eller
     # tas alla bort) blir det bara den.
 
+    # Vid första körningen, föredra en eventuell lank$bransch (kommaseparerad
+    # lista med branschnamn) framför ordinarie "behåll tidigare val"-logik.
+    lank_bransch_forst <- shiny::reactiveVal(TRUE)
+
     shiny::observeEvent(grupper_i_indelning(), {
       grp <- grupper_i_indelning()
       behall <- intersect(input$bransch_val, grp$grupp_namn)
+      fran_lank <- if (lank_bransch_forst() && !is.null(lank$bransch)) {
+        intersect(strsplit(lank$bransch, ',', fixed = TRUE)[[1]], grp$grupp_namn)
+      } else character(0)
+      lank_bransch_forst(FALSE)
+      val <- if (length(fran_lank) > 0) fran_lank
+             else if (length(behall) > 0) behall
+             else ALLA_BRANSCHER
       updateSelectizeInput(session, 'bransch_val',
                            choices  = c('Alla branscher' = ALLA_BRANSCHER,
                                         stats::setNames(grp$grupp_namn, grp$grupp_namn)),
-                           selected = if (length(behall) > 0) behall else ALLA_BRANSCHER)
+                           selected = val)
     })
 
     forra_bransch_val <- shiny::reactiveVal(ALLA_BRANSCHER)
@@ -285,14 +313,31 @@ mod_oversikt_server <- function(id) {
     # ggiraph avmarkerar (type = "single") om man klickar på samma stapel
     # igen och skickar då en tom vektor -- som Shiny gör om till NULL, så
     # ignoreNULL = FALSE krävs för att observern ska reagera på det också.
-    klickad_bransch <- shiny::reactiveVal(NULL)
+    klickad_bransch <- shiny::reactiveVal(
+      if (!is.null(lank$klick) && nzchar(lank$klick)) lank$klick else NULL
+    )
+    # ggiraph skickar sitt tomma startvärde för selection-input redan vid
+    # widgetens första rendering (inte bara vid en riktig avmarkeringsklick),
+    # vilket annars skulle nollställa ett lank$klick direkt vid sidladdning
+    # -- skydda bara den första körningen, och bara om en länk väntar.
+    skydda_lank_klick <- shiny::reactiveVal(!is.null(lank$klick) && nzchar(lank$klick))
     shiny::observeEvent(input$plot_bransch_sysselsatta_selected, ignoreNULL = FALSE, {
       val <- input$plot_bransch_sysselsatta_selected
+      forsta_korning <- skydda_lank_klick()
+      skydda_lank_klick(FALSE)
+      if (forsta_korning && (length(val) == 0 || !nzchar(val))) return(invisible(NULL))
       klickad_bransch(if (length(val) == 1 && nzchar(val)) val else NULL)
     })
     # Gruppnamnet hör till en viss indelning -- nollställ vid byte, annat
-    # branschnamn kan råka finnas i den nya indelningen också.
-    shiny::observeEvent(input$indelning_val, klickad_bransch(NULL), ignoreInit = TRUE)
+    # branschnamn kan råka finnas i den nya indelningen också. indelning_val
+    # sätts själv asynkront vid sessionsstart (se updateSelectInput ovan),
+    # så "ignoreInit" räcker inte för att skydda ett lank$klick-värde --
+    # ett engångsflagga hoppar bara över den allra första (ev. länkdrivna)
+    # ändringen, därefter nollställs som vanligt.
+    lank_klick_forst <- shiny::reactiveVal(TRUE)
+    shiny::observeEvent(input$indelning_val, ignoreInit = TRUE, {
+      if (lank_klick_forst()) lank_klick_forst(FALSE) else klickad_bransch(NULL)
+    })
 
     output$tid_rubrik <- renderText({
       b <- klickad_bransch()
@@ -330,6 +375,42 @@ mod_oversikt_server <- function(id) {
           kalla = 'SCB (RAMS), bearbetat av Region Dalarna'
         )
       }
+    })
+
+    # ---- Djuplänkning: "Kopiera länk till denna vy" --------------------
+    # Bygger en URL med dagens val som query-parametrar och kopierar den
+    # till urklipp. Tolkas tillbaka till samma vy av observerarna ovan
+    # (se "lank"-argumentet till mod_oversikt_server()).
+    shiny::observeEvent(input$kopiera_lank, {
+      q <- list(
+        flik      = 'oversikt',
+        ar        = input$ar_val,
+        indelning = input$indelning_val,
+        geografi  = input$geografi_val,
+        bransch   = paste(setdiff(input$bransch_val, ALLA_BRANSCHER), collapse = ','),
+        dim_lage  = input$dim_lage,
+        klick     = klickad_bransch()
+      )
+      q <- q[!vapply(q, function(x) is.null(x) || !nzchar(x), logical(1))]
+      query_sok <- paste(
+        mapply(function(namn, varde) paste0(namn, '=', utils::URLencode(varde, reserved = TRUE)),
+               names(q), unlist(q)),
+        collapse = '&'
+      )
+      shinyjs::runjs(sprintf(
+        "var url = window.location.origin + window.location.pathname + '?%s';
+         if (navigator.clipboard && window.isSecureContext) {
+           navigator.clipboard.writeText(url);
+         } else {
+           var ta = document.createElement('textarea');
+           ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+           document.body.appendChild(ta); ta.select();
+           document.execCommand('copy'); document.body.removeChild(ta);
+         }",
+        query_sok
+      ))
+      shiny::showNotification('Länk till den här vyn kopierad till urklipp.',
+                              type = 'message', duration = 4)
     })
   })
 }
