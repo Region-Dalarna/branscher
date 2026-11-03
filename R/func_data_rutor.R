@@ -21,7 +21,7 @@ RUTA_LITEN_GRANS <- 4     # rutor med färre sysselsatta visas som en egen, ljus
 URVAL_MIN_SYSS   <- 30    # minsta antal sysselsatta i länet för att en bransch/ett yrke ska gå att välja
 YRKE_SAKNAS      <- "****"
 
-KALLA_RUTOR <- "SCB, sysselsatta efter arbetsställets läge (100-metersrutor), bearbetat av Region Dalarna"
+KALLA_RUTOR <- "SCB, sysselsatta efter arbetsställets läge (kilometerrutor), bearbetat av Region Dalarna"
 
 .rutor_cache <- new.env(parent = emptyenv())
 
