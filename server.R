@@ -21,6 +21,7 @@ shinyServer(function(input, output, session) {
 
   # Övriga flikar är platshållare utan server tills vidare.
   mod_oversikt_server('oversikt', lank = lank)
+  mod_geografi_server('geografi', aktiv = reactive(input$flik == 'Geografi'))
   # Flikarna nedan hämtar data först när de öppnas (aktiv).
   utb_yrken <- mod_utbildning_yrken_server('utbildning_yrken',
                                           aktiv = reactive(input$flik == 'Utbildning & yrken'))

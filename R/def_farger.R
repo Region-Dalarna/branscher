@@ -35,6 +35,11 @@ RD_SELECT_CSS <- paste0("stroke:", RD_PRIMARY, ";stroke-width:2px;fill-opacity:1
 # sex serier åt gången.
 RD_KATEGORISK <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300")
 
+# Kartan på fliken Geografi: rutor med färre än RUTA_LITEN_GRANS sysselsatta
+# i en egen, ljusaste färg; övriga på en kontinuerlig (logaritmisk) skala.
+RUTA_LITEN_FARG <- "#cde5ee"
+RUTOR_SKALA     <- c("#86bfd4", RD_PRIMARY, "#0a3a50")
+
 # SCB:s bedömning av arbetsmarknadsläget 2040 (RegTop): rödbrun = brist,
 # grå = balans, blå = överskott. Samma värden som BEDOMNING_FARGER i
 # Utbildning-appens def_farger.R -- håll dem i synk. "Prognos saknas" ljusgrå.

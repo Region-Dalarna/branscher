@@ -34,6 +34,8 @@ telemetry <- skapa_telemetry("branscher")
 #   R/func_diagram_yrke_utb.R   diagram för flikarna Utbildning & yrken, Matchning, Demografi
 #   R/func_ui.R                 delade UI-byggstenar (nyckeltalskort med förklaring)
 #   R/mod_oversikt.R            modul: flik Översikt
+#   R/func_data_rutor.R         dataåtkomst rutdata (db sekretess, aggregeras till km-rutor i databasen)
+#   R/mod_geografi.R            modul: flik Geografi (karta, leaflet)
 #   R/mod_urval_yrke.R          gemensamma val för flikarna nedan
 #   R/mod_utbildning_yrken.R    modul: flik Utbildning & yrken
 #   R/mod_matchning.R           modul: flik Matchning

@@ -13,6 +13,7 @@
 
 FLIK_SLUGS <- c(
   oversikt   = 'Översikt',
+  geografi   = 'Geografi',
   utbildning = 'Utbildning & yrken',
   matchning  = 'Matchning',
   demografi  = 'Demografi',
