@@ -5,6 +5,8 @@
 #  Källa (databasen "sekretess"): rutor.syssrutor_100m. En rad per
 #  100-metersruta (arbetsställets läge, geom i SWEREF99 TM) x bransch
 #  (SNI 5-siffrigt) x yrke (SSYK 4-siffrigt), med antal sysselsatta.
+#  branschkod är ett heltal (inledande nolla saknas, 02101 lagras som 2101),
+#  så SNI-huvudgruppen räknas fram som floor(branschkod / 1000).
 #
 #  Allt aggregeras i databasen till 1000-metersrutor innan collect(), så
 #  appen hämtar aldrig mikrodata -- bara antal per km-ruta för valt urval.
@@ -56,11 +58,11 @@ hamta_rutor_bransch_totaler <- function(ar_val) {
     on.exit(DBI::dbDisconnect(con))
     .rutor_tbl(con) |>
       dplyr::filter(ar == !!ar_val) |>
-      dplyr::mutate(sni2 = substr(branschkod, 1L, 2L)) |>
+      dplyr::mutate(sni2 = floor(branschkod / 1000)) |>
       dplyr::group_by(sni2) |>
       dplyr::summarise(antal = sum(antal, na.rm = TRUE), .groups = "drop") |>
       dplyr::collect() |>
-      dplyr::mutate(antal = as.numeric(antal))
+      dplyr::mutate(sni2 = sprintf("%02d", as.integer(sni2)), antal = as.numeric(antal))
   })
 }
 
@@ -109,7 +111,7 @@ hamta_rutor_km <- function(ar_val, sni2 = NULL, yrkeskoder = NULL) {
     con <- .rutor_uppkoppling()
     on.exit(DBI::dbDisconnect(con))
     q <- .rutor_tbl(con) |> dplyr::filter(ar == !!ar_val)
-    if (!is.null(sni2))       q <- dplyr::filter(q, substr(branschkod, 1L, 2L) %in% !!sni2)
+    if (!is.null(sni2))       q <- dplyr::filter(q, floor(branschkod / 1000) %in% !!as.integer(sni2))
     if (!is.null(yrkeskoder)) q <- dplyr::filter(q, yrkeskod %in% !!yrkeskoder)
     q |>
       dplyr::mutate(
