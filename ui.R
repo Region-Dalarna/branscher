@@ -1,3 +1,5 @@
+APP_BESKRIVNING <- 'Statistik om branscher, yrken, matchning, demografi och kompetensbehov på arbetsmarknaden i Dalarna.'
+
 shinyUI(
   fluidPage(
     shinyjs::useShinyjs(),
@@ -57,11 +59,11 @@ shinyUI(
         id = 'flik',
 
         tabPanel('Översikt', mod_oversikt_ui('oversikt')),
-        tabPanel('Geografi',                mod_geografi_ui('geografi')),
         tabPanel('Utbildning & yrken',      mod_utbildning_yrken_ui('utbildning_yrken')),
         tabPanel('Matchning',               mod_matchning_ui('matchning')),
         tabPanel('Demografi',               mod_demografi_ui('demografi')),
         tabPanel('Behov & rekrytering',     mod_behov_ui('behov')),
+        tabPanel('Geografi',                mod_geografi_ui('geografi')),
         tabPanel('Rörlighet & hälsa',       mod_flik_placeholder_ui('rorlighet_halsa', 'Rörlighet & hälsa')),
         tabPanel('Prognos',                 mod_prognos_ui('prognos')),
 
@@ -85,15 +87,15 @@ shinyUI(
                 tags$li(tags$strong('Utbildning & yrken, Matchning, Demografi: '),
                         'sysselsatta efter yrke, utbildning, matchning, ålder, kön och bakgrund. ',
                         'Källa: SCB (Yrkesregistret, Utbildningsregistret).'),
+                tags$li(tags$strong('Geografi: '),
+                        'sysselsatta per 1 × 1 km-ruta efter arbetsställets läge, per bransch ',
+                        'eller yrke, Dalarnas län. Bara branscher och yrken med minst 30 ',
+                        'sysselsatta i länet går att välja. Källa: SCB (rutdata).'),
                 tags$li(tags$strong('Prognos: '),
                         'förvärvsarbetande per näringsgren och arbetskraften 2023–2040, Dalarnas län ',
                         'och riket. Källa: SCB, Regionala trender och prognoser 2025, ',
                         'publicerad 2026-05-25. Prognosen använder egna näringsgrenar och finns ',
-                        'bara för län och riket.'),
-                tags$li(tags$strong('Geografi: '),
-                        'sysselsatta per 1 × 1 km-ruta efter arbetsställets läge, per bransch ',
-                        'eller yrke, Dalarnas län. Bara branscher och yrken med minst 30 ',
-                        'sysselsatta i länet går att välja. Källa: SCB (rutdata).')
+                        'bara för län och riket.')
               ),
               div(class = 'rd-info',
                   tags$strong('Sekretess: '),
