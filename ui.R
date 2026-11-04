@@ -1,3 +1,5 @@
+APP_BESKRIVNING <- 'Statistik om branscher, yrken, matchning, demografi och kompetensbehov på arbetsmarknaden i Dalarna.'
+
 shinyUI(
   fluidPage(
     shinyjs::useShinyjs(),
