@@ -7,6 +7,12 @@ shinyUI(
       tags$link(rel = 'icon', type = 'image/x-icon', href = 'favicon.ico'),
       tags$link(rel = 'stylesheet', type = 'text/css', href = www_version('regiondalarna_ruf.css')),
       tags$link(rel = 'stylesheet', type = 'text/css', href = www_version('app.css')),
+      # Knapptooltips via tippy.js (självhostat), se www/tooltips.js. Popper
+      # måste laddas före tippy-bundle.
+      tags$link(rel = 'stylesheet', type = 'text/css', href = 'tippy.css'),
+      tags$script(src = 'popper.min.js'),
+      tags$script(src = 'tippy-bundle.umd.min.js'),
+      tags$script(src = www_version('tooltips.js')),
       tags$script(src = www_version('sidopanel.js')),
       telemetri_ui(telemetry)
     ),

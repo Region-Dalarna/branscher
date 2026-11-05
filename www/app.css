@@ -299,3 +299,24 @@
     max-width: none;
   }
 }
+
+/* ---- Hover-tooltips (tippy.js) -----------------------------------------
+   Samma look som RD_TOOLTIP_CSS på ggiraph-diagrammen, så tooltip-stilen
+   känns igen oavsett om den kommer från ett diagram eller en knapp. */
+.tippy-box[data-theme~='rd'] {
+  background-color: var(--rd-text);
+  color: #fff;
+  font-family: Poppins, Arial, sans-serif;
+  font-size: 12px;
+  border-radius: 4px;
+  line-height: 1.35;
+}
+.tippy-box[data-theme~='rd'] .tippy-content {
+  padding: 6px 9px;
+}
+.tippy-box[data-theme~='rd'][data-placement^='top'] > .tippy-arrow::before {
+  border-top-color: var(--rd-text);
+}
+.tippy-box[data-theme~='rd'][data-placement^='bottom'] > .tippy-arrow::before {
+  border-bottom-color: var(--rd-text);
+}
