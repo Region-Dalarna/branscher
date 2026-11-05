@@ -164,10 +164,12 @@ hamta_branschkoder <- function(indelning_kolumn, grupp_namn) {
 # Yrke x utbildning(sgrupp) för vald geografi och riket. Grund för
 # nyckeltal och båda mosaikerna (yrke -> utbildningar och utbildning ->
 # yrken). Returnerar kolumnerna kommun_kod, yrke_kod, yrke_namn,
-# utb_kod, utb_namn, antal.
-hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol, villkor = list()) {
+# utb_kod, utb_namn, antal -- och kon om med_kon = TRUE.
+hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol, villkor = list(),
+                             med_kon = FALSE) {
   namn_kol <- .utb_namn_kol(utb_kol)
-  dims <- c("ssyk3_2012", "ssyk3_2012_namn", utb_kol, stats::na.omit(namn_kol))
+  dims <- c("ssyk3_2012", "ssyk3_2012_namn", utb_kol, stats::na.omit(namn_kol),
+            if (med_kon) "kon")
 
   df <- hamta_yrke_utb(ar_val, unique(c(geografi, "00")), dims, branschkoder, villkor)
 
@@ -179,11 +181,70 @@ hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol, villkor = 
       utb_kod   = .kod_eller_saknas(.data[[utb_kol]]),
       utb_namn  = .namn_eller_kod(if (is.na(namn_kol)) NA_character_ else .data[[namn_kol]],
                                   utb_kod),
+      kon       = if (med_kon) as.character(kon) else NA_character_,
       antal
     ) |>
     # Koder som saknar namn kan ge flera rader per kod -- slå ihop.
+    dplyr::group_by(kommun_kod, yrke_kod, yrke_namn, utb_kod, utb_namn,
+                    dplyr::across(dplyr::any_of(if (med_kon) "kon"))) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop") |>
+    dplyr::select(-dplyr::any_of(if (!med_kon) "kon"))
+}
+
+# Summerar bort kön ur resultatet från hamta_yrke_x_utb(med_kon = TRUE).
+utan_kon <- function(yrke_x_utb_kon) {
+  yrke_x_utb_kon |>
     dplyr::group_by(kommun_kod, yrke_kod, yrke_namn, utb_kod, utb_namn) |>
     dplyr::summarise(antal = sum(antal), .groups = "drop")
+}
+
+# Antal sysselsatta per kategori inom ett valt yrke (kat = "utb") eller en
+# vald utbildning (kat = "yrke"), i vald geografi -- underlag för
+# stapeldiagrammen. Visar de n största kända kategorierna; valda läggs till
+# först (även med 0 sysselsatta) och de minsta faller bort. bara_valda visar
+# bara de valda. kon_uppdelat ger en rad per kön (Kvinnor/Män), annars
+# kon_namn = "Totalt". Antal under 4 blir NA (redovisas inte).
+# Kolumner: enhet_kod, enhet_namn, kon_namn, antal, total.
+antal_inom <- function(yrke_x_utb_kon, geografi, filter_kol, filter_varde, kat,
+                       n = 15, valda = character(0), bara_valda = FALSE,
+                       kon_uppdelat = FALSE) {
+  kod_kol  <- paste0(kat, "_kod")
+  namn_kol <- paste0(kat, "_namn")
+  alla_namn <- yrke_x_utb_kon |>
+    dplyr::filter(kommun_kod == geografi) |>
+    dplyr::distinct(enhet_kod = .data[[kod_kol]], enhet_namn = .data[[namn_kol]])
+
+  d <- yrke_x_utb_kon |>
+    dplyr::filter(kommun_kod == geografi, .data[[filter_kol]] == filter_varde) |>
+    dplyr::transmute(enhet_kod = .data[[kod_kol]], enhet_namn = .data[[namn_kol]],
+                     kon_namn = if (kon_uppdelat) .kon_namn(kon) else "Totalt", antal) |>
+    dplyr::group_by(enhet_kod, enhet_namn, kon_namn) |>
+    dplyr::summarise(antal = sum(antal), .groups = "drop")
+
+  total <- d |>
+    dplyr::count(enhet_kod, enhet_namn, wt = antal, name = "total") |>
+    dplyr::arrange(dplyr::desc(total))
+  kanda <- total$enhet_kod[!.ar_okand(total$enhet_kod, total$enhet_namn)]
+  valda <- intersect(valda, alla_namn$enhet_kod)
+  fyll  <- if (bara_valda) character(0) else
+    utils::head(setdiff(kanda, valda), max(0, n - length(valda)))
+  med <- c(valda, fyll)
+
+  # Valda utan sysselsatta i urvalet visas som 0.
+  saknas <- alla_namn |>
+    dplyr::filter(enhet_kod %in% setdiff(valda, d$enhet_kod)) |>
+    dplyr::mutate(kon_namn = if (kon_uppdelat) "Kvinnor" else "Totalt", antal = 0)
+
+  dplyr::bind_rows(dplyr::filter(d, enhet_kod %in% med), saknas) |>
+    dplyr::group_by(enhet_kod) |>
+    dplyr::mutate(total = sum(antal)) |>
+    dplyr::ungroup() |>
+    dplyr::mutate(antal = dplyr::if_else(antal > 0 & antal < 4, NA_real_, as.numeric(antal)))
+}
+
+.kon_namn <- function(kon) {
+  dplyr::case_when(kon == "Kvinna" ~ "Kvinnor", kon == "Man" ~ "Män",
+                   TRUE ~ "Uppgift saknas")
 }
 
 # Alla koder och namn behöver ett värde -- NA ger fel i väljarna

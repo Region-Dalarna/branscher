@@ -343,3 +343,72 @@ skapa_tabell_topp <- function(df, kolumnrubrik, geo_namn = "Vald geografi", n = 
                           tag = shiny::tags$th))
   )
 }
+
+# ---- Liggande staplar: antal inom ett yrke / en utbildning -----------------
+# df från antal_inom(). Totalt = en stapel per rad; könsuppdelat = staplat
+# per kön (samma färger som Översikt). Antal under 4 (NA) ritas inte och
+# redovisas som "färre än 4" i tooltipen. markerad = enhet_kod som
+# framhävs med ljus rand och fet etikett (som i skapa_diagram_fordelning()).
+# Klickbar: data_id = enhet_kod.
+skapa_diagram_antal_inom <- function(df, markerad = NULL, rubrik = NULL,
+                                     underrubrik = NULL, kalla = NULL) {
+  if (nrow(df) == 0) {
+    return(.girafe_std(.tom_plot("Inga sysselsatta att visa i urvalet"), height_svg = 1.5))
+  }
+  ordning <- df |> dplyr::distinct(enhet_kod, enhet_namn, total) |>
+    dplyr::arrange(total, dplyr::desc(enhet_namn))
+  kon_uppdelat <- !all(df$kon_namn == "Totalt")
+  farger <- if (kon_uppdelat) {
+    c(KON_FARGER, "Uppgift saknas" = RD_TEXT_MUTED)
+  } else {
+    c("Totalt" = RD_PRIMARY)
+  }
+
+  antal_txt <- function(x) ifelse(is.na(x), "färre än 4",
+                                  format(x, big.mark = " ", scientific = FALSE, trim = TRUE))
+  d <- df |>
+    dplyr::mutate(
+      enhet_namn = factor(enhet_namn, levels = ordning$enhet_namn),
+      kon_namn   = factor(kon_namn, levels = intersect(names(farger), unique(kon_namn))),
+      antal_vy   = dplyr::coalesce(antal, 0),
+      tooltip    = paste0(
+        "<b>", htmltools::htmlEscape(enhet_namn), "</b><br/>",
+        if (kon_uppdelat) paste0(kon_namn, ": ", antal_txt(antal), "<br/>Totalt: ") else "",
+        antal_txt(dplyr::if_else(total > 0 & total < 4, NA_real_, total)), " sysselsatta")
+    )
+
+  markerad <- markerad[nzchar(markerad %||% character(0))]
+  rand <- d |> dplyr::filter(enhet_kod %in% markerad) |> dplyr::distinct(enhet_namn)
+  etiketter <- function(x) {
+    txt <- gsub("\n", "<br>", htmltools::htmlEscape(scales::label_wrap(45)(x)))
+    ifelse(x %in% rand$enhet_namn, paste0("<b>", txt, "</b>"), txt)
+  }
+  xmax <- max(1, d |> dplyr::group_by(enhet_namn) |> dplyr::summarise(s = sum(antal_vy)) |>
+                dplyr::pull(s))
+
+  g <- ggplot2::ggplot(d, ggplot2::aes(x = antal_vy, y = enhet_namn, fill = kon_namn)) +
+    ggplot2::geom_tile(data = rand, ggplot2::aes(x = xmax / 2, y = enhet_namn),
+                       width = xmax * 1.04, height = 0.96, fill = "#d6ebf2",
+                       inherit.aes = FALSE) +
+    ggiraph::geom_col_interactive(
+      ggplot2::aes(tooltip = tooltip, data_id = enhet_kod),
+      width = 0.72, color = "white", linewidth = 0.3
+    ) +
+    ggplot2::scale_fill_manual(values = farger, breaks = names(farger), name = NULL,
+                               drop = TRUE) +
+    ggplot2::scale_y_discrete(limits = levels(d$enhet_namn), labels = etiketter) +
+    ggplot2::scale_x_continuous(labels = scales::number_format(big.mark = " "),
+                                expand = ggplot2::expansion(mult = c(0, 0.04))) +
+    ggplot2::labs(x = NULL, y = NULL, title = rubrik, subtitle = underrubrik,
+                  caption = .kalltext(kalla)) +
+    .rd_tema() +
+    ggplot2::theme(legend.position = if (kon_uppdelat) "top" else "none",
+                   legend.justification = "left",
+                   axis.text.y.left = ggtext::element_markdown(hjust = 1, halign = 1,
+                                                               lineheight = 1.1,
+                                                               margin = ggplot2::margin(r = 4)))
+
+  .girafe_std(g, width_svg = 10,
+              height_svg = max(3, dplyr::n_distinct(d$enhet_namn) * 0.38 + 1.8),
+              selection = TRUE)
+}

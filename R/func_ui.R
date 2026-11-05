@@ -35,7 +35,8 @@ www_version <- function(fil) {
 # till yrken (input `yrken_val`) och kryssruta "Visa bara valda yrken"
 # (input `bara_valda`). Utan kryss läggs valda yrken till bland de
 # största och framhävs; med kryss visas bara de valda.
-yrkesval_ui <- function(ns, placeholder = 'S\u00f6k och l\u00e4gg till yrken\u2026', class = NULL) {
+yrkesval_ui <- function(ns, placeholder = 'S\u00f6k och l\u00e4gg till yrken\u2026', class = NULL,
+                        bara_etikett = 'Visa bara valda yrken') {
   div(class = paste(c('rd-yrkesval', class), collapse = ' '),
       div(class = 'rd-yrkesval__sok',
           selectizeInput(ns('yrken_val'), NULL, choices = NULL, multiple = TRUE, width = '100%',
@@ -43,7 +44,7 @@ yrkesval_ui <- function(ns, placeholder = 'S\u00f6k och l\u00e4gg till yrken\u20
                                         sortField = '$order',
                                         placeholder = placeholder))),
       div(class = 'rd-yrkesval__bara',
-          checkboxInput(ns('bara_valda'), 'Visa bara valda yrken', value = FALSE)))
+          checkboxInput(ns('bara_valda'), bara_etikett, value = FALSE)))
 }
 
 # Selectize-inställningar för en väljare där man oftast vill ha ett val i

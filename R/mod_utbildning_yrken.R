@@ -8,7 +8,9 @@
 #     rekryteringsbredd (median antal utbildningsgrupper för 80 %)
 #   - Mosaik: vilka utbildningar har de som arbetar inom valt yrke?
 #   - Mosaik: inom vilka yrken arbetar de med vald utbildning?
-#     Båda med tabell över de fem vanligaste (vald geografi + riket).
+#     Båda med stapeldiagram över antal (de STAPEL_N största + egna
+#     tillägg, totalt eller könsuppdelat) och tabell över de fem
+#     vanligaste (vald geografi + riket).
 #     Klick på en ruta väljer den i den andra mosaiken.
 #
 #  Data hämtas aggregerad från databasen per urval (se
@@ -17,6 +19,25 @@
 
 UTB_YRKE_TOTALT  <- 'totalt'
 UTB_YRKE_MAX_UNG <- 39  # åldersvalet "-39 år" = åldersgrupper med övre gräns <= 39
+STAPEL_N         <- 15  # antal staplar i "Antal sysselsatta per utbildning/yrke"
+
+# Stapeldiagram med antal under en mosaik: Totalt/Könsuppdelat, sökruta
+# för att lägga till egna (inputs <id>-yrken_val och <id>-bara_valda).
+stapel_ui <- function(ns, id, rubrik, text, placeholder, bara_etikett) {
+  div(class = 'rd-staplar',
+      h3(rubrik),
+      div(class = 'rd-subtitle', text),
+      div(class = 'rd-sortering',
+          span(class = 'rd-sortering__label', 'Visa:'),
+          shinyWidgets::radioGroupButtons(
+            ns(paste0(id, '_kon')), label = NULL, individual = TRUE, size = 'sm',
+            choices = c('Totalt' = 'totalt', 'Könsuppdelat' = 'kon'), selected = 'totalt'),
+          conditionalPanel(
+            sprintf("input.kon_val != '%s'", UTB_YRKE_TOTALT), ns = ns,
+            span(class = 'rd-hint', 'Könsuppdelat går inte att välja när ett kön är valt i sidopanelen.'))),
+      yrkesval_ui(NS(ns(id)), placeholder = placeholder, bara_etikett = bara_etikett),
+      girafeOutput(ns(paste0(id, '_plot')), height = 'auto'))
+}
 
 mod_utbildning_yrken_ui <- function(id) {
   ns <- NS(id)
@@ -78,6 +99,11 @@ mod_utbildning_yrken_ui <- function(id) {
                                  options = list(placeholder = 'Sök yrke…',
                                                 sortField = '$order'))),
               girafeOutput(ns('plot_yrke_utb'), height = 'auto'),
+              stapel_ui(ns, 'stapel_utb', 'Antal sysselsatta per utbildning',
+                        paste0('De ', STAPEL_N, ' största utbildningarna bland dem som arbetar ',
+                               'inom yrket. Utbildningar du lägger till framhävs och ersätter de ',
+                               'minsta. Klicka på en stapel för att se utbildningens yrken nedan.'),
+                        'Sök och lägg till utbildningar…', 'Visa bara valda utbildningar'),
               div(class = 'rd-topp',
                   h3('De fem vanligaste utbildningarna'),
                   uiOutput(ns('tabell_yrke_utb')))
@@ -93,6 +119,11 @@ mod_utbildning_yrken_ui <- function(id) {
                                  options = list(placeholder = 'Sök utbildning…',
                                                 sortField = '$order'))),
               girafeOutput(ns('plot_utb_yrke'), height = 'auto'),
+              stapel_ui(ns, 'stapel_yrke', 'Antal sysselsatta per yrke',
+                        paste0('De ', STAPEL_N, ' största yrkena bland dem med utbildningen. ',
+                               'Yrken du lägger till framhävs och ersätter de minsta. Klicka på ',
+                               'en stapel för att se yrkets utbildningar ovan.'),
+                        'Sök och lägg till yrken…', 'Visa bara valda yrken'),
               div(class = 'rd-topp',
                   h3('De fem vanligaste yrkena'),
                   uiOutput(ns('tabell_utb_yrke')))
@@ -130,12 +161,16 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       if (length(delar) == 0) '' else paste0(' · ', paste(delar, collapse = ', '))
     })
 
-    yrke_x_utb <- shiny::reactive({
+    # En fråga med kön som extra dimension räcker för både mosaikerna
+    # (kön summeras bort) och de könsuppdelade staplarna.
+    yrke_x_utb_kon <- shiny::reactive({
       shiny::req(input$utb_indelning_val)
       hamta_yrke_x_utb(urval$ar(), urval$geografi(), urval$branschkoder(),
-                       input$utb_indelning_val, villkor())
+                       input$utb_indelning_val, villkor(), med_kon = TRUE)
     }) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$branschkoder(),
-                           input$utb_indelning_val, villkor())
+                           input$utb_indelning_val, villkor(), 'med_kon')
+
+    yrke_x_utb <- shiny::reactive(utan_kon(yrke_x_utb_kon()))
 
     vald_x_utb <- shiny::reactive(
       dplyr::filter(yrke_x_utb(), kommun_kod == urval$geografi())
@@ -184,6 +219,25 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
                            choices  = stats::setNames(utb$utb_kod, utb$utb_namn),
                            selected = behall(input$utb_val, utb, 'utb_kod',
                                              forval(utb$utb_kod, utb$utb_namn, hoppa_over = grundskola)))
+
+      # Sökrutorna vid staplarna: utbildningar resp. yrken att lägga till.
+      updateSelectizeInput(session, 'stapel_utb-yrken_val',
+                           choices  = stats::setNames(utb$utb_kod, utb$utb_namn),
+                           selected = intersect(input[['stapel_utb-yrken_val']], utb$utb_kod))
+      updateSelectizeInput(session, 'stapel_yrke-yrken_val',
+                           choices  = stats::setNames(yrken$yrke_kod, yrken$yrke_namn),
+                           selected = intersect(input[['stapel_yrke-yrken_val']], yrken$yrke_kod))
+    })
+
+    # Könsuppdelat går inte när ett kön är valt i sidopanelen.
+    shiny::observeEvent(input$kon_val, ignoreInit = TRUE, {
+      sparra <- input$kon_val != UTB_YRKE_TOTALT
+      for (id in c('stapel_utb_kon', 'stapel_yrke_kon')) {
+        shinyWidgets::updateRadioGroupButtons(
+          session, id,
+          selected        = if (sparra) 'totalt' else input[[id]],
+          disabledChoices = if (sparra) 'kon' else character(0))
+      }
     })
 
     # Klick på en ruta väljer den i den andra mosaiken ("övr" = Övriga).
@@ -198,6 +252,14 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       if (length(val) == 1 && !val %in% c('', 'övr')) {
         updateSelectizeInput(session, 'yrke_val', selected = val)
       }
+    })
+    shiny::observeEvent(input$stapel_utb_plot_selected, {
+      val <- input$stapel_utb_plot_selected
+      if (length(val) == 1 && nzchar(val)) updateSelectizeInput(session, 'utb_val', selected = val)
+    })
+    shiny::observeEvent(input$stapel_yrke_plot_selected, {
+      val <- input$stapel_yrke_plot_selected
+      if (length(val) == 1 && nzchar(val)) updateSelectizeInput(session, 'yrke_val', selected = val)
     })
 
     # ---- Nyckeltal -------------------------------------------------------
@@ -248,6 +310,35 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     output$plot_utb_yrke   <- renderGirafe(mosaik(utb_yrke()))
     output$tabell_yrke_utb <- renderUI(tabell(yrke_utb(), 'Utbildning'))
     output$tabell_utb_yrke <- renderUI(tabell(utb_yrke(), 'Yrke'))
+
+    # ---- Staplar: antal per utbildning / yrke ------------------------------
+
+    stapel <- function(id, filter_kol, filter_varde, kat, vad) {
+      valda <- input[[paste0(id, '-yrken_val')]] %||% character(0)
+      bara  <- isTRUE(input[[paste0(id, '-bara_valda')]])
+      if (bara && length(valda) == 0) {
+        return(.girafe_std(.tom_plot(paste('Lägg till', vad, 'i sökrutan ovan')),
+                           height_svg = 1.5))
+      }
+      d <- antal_inom(yrke_x_utb_kon(), urval$geografi(), filter_kol, filter_varde, kat,
+                      n = STAPEL_N, valda = valda, bara_valda = bara,
+                      kon_uppdelat = identical(input[[paste0(id, '_kon')]], 'kon'))
+      vald_namn <- vald_x_utb()[[sub('_kod$', '_namn', filter_kol)]][
+        match(filter_varde, vald_x_utb()[[filter_kol]])]
+      skapa_diagram_antal_inom(
+        d, markerad = if (bara) NULL else valda,
+        underrubrik = paste0(vald_namn, ' · ', urval$underrubrik(), urvalstext(), ' · ',
+                             if (bara) paste('valda', vad) else paste(STAPEL_N, 'största', vad)),
+        kalla = KALLA_YRKE_UTB)
+    }
+    output$stapel_utb_plot <- renderGirafe({
+      shiny::req(input$yrke_val)
+      stapel('stapel_utb', 'yrke_kod', input$yrke_val, 'utb', 'utbildningar')
+    })
+    output$stapel_yrke_plot <- renderGirafe({
+      shiny::req(input$utb_val)
+      stapel('stapel_yrke', 'utb_kod', input$utb_val, 'yrke', 'yrken')
+    })
 
     # Valt yrke (SSYK 2012, tresiffrig) -- används av Behov & rekrytering.
     list(yrke = shiny::reactive(input$yrke_val))

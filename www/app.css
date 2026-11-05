@@ -28,6 +28,14 @@
 /* Väljare inuti ett kort (t.ex. yrke/utbildning ovanför en mosaik). */
 .rd-field--kort { max-width: 520px; margin: 4px 0 8px; }
 
+/* Stapeldiagram med antal under en mosaik. */
+.rd-staplar { margin-top: 20px; }
+.rd-staplar h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
 /* Topplista under en mosaik. */
 .rd-topp { max-width: 760px; margin-top: 16px; }
 .rd-topp h3 {
