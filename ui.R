@@ -1,7 +1,9 @@
+APP_TITEL       <- 'Branschstatistik Dalarna'
 APP_BESKRIVNING <- 'Statistik om branscher, yrken, matchning, demografi och kompetensbehov på arbetsmarknaden i Dalarna.'
 
 shinyUI(
   fluidPage(
+    title = APP_TITEL,  # webbläsarflikens rubrik
     shinyjs::useShinyjs(),
     tags$head(
       tags$link(rel = 'icon', type = 'image/x-icon', href = 'favicon.ico'),
@@ -20,7 +22,7 @@ shinyUI(
     # ---- Header (full bredd via app.css) ---------------------------------
     tags$div(
       class = 'rd-header',
-      tags$div(class = 'rd-header__title', 'Branschstatistik Dalarna'),
+      tags$div(class = 'rd-header__title', APP_TITEL),
       tags$a(
         class  = 'rd-header__right',
         href   = 'https://www.regiondalarna.se',
