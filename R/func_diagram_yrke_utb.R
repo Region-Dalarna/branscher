@@ -344,12 +344,11 @@ skapa_tabell_topp <- function(df, kolumnrubrik, geo_namn = "Vald geografi", n = 
   )
 }
 
-# ---- Liggande staplar: antal inom ett yrke / en utbildning -----------------
-# df från antal_inom(). Totalt = en stapel per rad; könsuppdelat = staplat
+# ---- Liggande staplar: antal per bransch, yrke eller utbildning ----------
+# df från antal_topp(). Totalt = en stapel per rad; könsuppdelat = staplat
 # per kön (samma färger som Översikt). Antal under 4 (NA) ritas inte och
 # redovisas som "färre än 4" i tooltipen. markerad = enhet_kod som
 # framhävs med ljus rand och fet etikett (som i skapa_diagram_fordelning()).
-# Klickbar: data_id = enhet_kod.
 skapa_diagram_antal_inom <- function(df, markerad = NULL, rubrik = NULL,
                                      underrubrik = NULL, kalla = NULL) {
   if (nrow(df) == 0) {
@@ -369,7 +368,9 @@ skapa_diagram_antal_inom <- function(df, markerad = NULL, rubrik = NULL,
   d <- df |>
     dplyr::mutate(
       enhet_namn = factor(enhet_namn, levels = ordning$enhet_namn),
-      kon_namn   = factor(kon_namn, levels = intersect(names(farger), unique(kon_namn))),
+      # Omvänd ordning: position_stack lägger första nivån längst ut, och
+      # kvinnor ska ligga närmast axeln (förklaringen styrs av breaks).
+      kon_namn   = factor(kon_namn, levels = rev(intersect(names(farger), unique(kon_namn)))),
       antal_vy   = dplyr::coalesce(antal, 0),
       tooltip    = paste0(
         "<b>", htmltools::htmlEscape(enhet_namn), "</b><br/>",
@@ -390,8 +391,10 @@ skapa_diagram_antal_inom <- function(df, markerad = NULL, rubrik = NULL,
     ggplot2::geom_tile(data = rand, ggplot2::aes(x = xmax / 2, y = enhet_namn),
                        width = xmax * 1.04, height = 0.96, fill = "#d6ebf2",
                        inherit.aes = FALSE) +
+    # group = kon_namn: annars blir varje unik tooltip en egen grupp och
+    # staplingsordningen följer tooltiptexten i stället för könet.
     ggiraph::geom_col_interactive(
-      ggplot2::aes(tooltip = tooltip, data_id = enhet_kod),
+      ggplot2::aes(tooltip = tooltip, data_id = enhet_kod, group = kon_namn),
       width = 0.72, color = "white", linewidth = 0.3
     ) +
     ggplot2::scale_fill_manual(values = farger, breaks = names(farger), name = NULL,
@@ -409,6 +412,5 @@ skapa_diagram_antal_inom <- function(df, markerad = NULL, rubrik = NULL,
                                                                margin = ggplot2::margin(r = 4)))
 
   .girafe_std(g, width_svg = 10,
-              height_svg = max(3, dplyr::n_distinct(d$enhet_namn) * 0.38 + 1.8),
-              selection = TRUE)
+              height_svg = max(3, dplyr::n_distinct(d$enhet_namn) * 0.38 + 1.8))
 }

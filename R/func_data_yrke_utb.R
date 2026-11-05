@@ -198,26 +198,17 @@ utan_kon <- function(yrke_x_utb_kon) {
     dplyr::summarise(antal = sum(antal), .groups = "drop")
 }
 
-# Antal sysselsatta per kategori inom ett valt yrke (kat = "utb") eller en
-# vald utbildning (kat = "yrke"), i vald geografi -- underlag för
-# stapeldiagrammen. Visar de n största kända kategorierna; valda läggs till
-# först (även med 0 sysselsatta) och de minsta faller bort. bara_valda visar
-# bara de valda. kon_uppdelat ger en rad per kön (Kvinnor/Män), annars
-# kon_namn = "Totalt". Antal under 4 blir NA (redovisas inte).
-# Kolumner: enhet_kod, enhet_namn, kon_namn, antal, total.
-antal_inom <- function(yrke_x_utb_kon, geografi, filter_kol, filter_varde, kat,
-                       n = 15, valda = character(0), bara_valda = FALSE,
+# Underlag för stapeldiagrammen med antal. d: enhet_kod, enhet_namn, kon,
+# antal (flera rader per enhet går bra). alla: enhet_kod, enhet_namn för
+# allt som går att lägga till. Visar de n största kända enheterna; valda
+# läggs till först (även med 0 sysselsatta) och de minsta faller bort.
+# bara_valda visar bara de valda. kon_uppdelat ger en rad per kön
+# (Kvinnor/Män), annars kon_namn = "Totalt". Antal under 4 blir NA
+# (redovisas inte). Kolumner: enhet_kod, enhet_namn, kon_namn, antal, total.
+antal_topp <- function(d, alla, n = 15, valda = character(0), bara_valda = FALSE,
                        kon_uppdelat = FALSE) {
-  kod_kol  <- paste0(kat, "_kod")
-  namn_kol <- paste0(kat, "_namn")
-  alla_namn <- yrke_x_utb_kon |>
-    dplyr::filter(kommun_kod == geografi) |>
-    dplyr::distinct(enhet_kod = .data[[kod_kol]], enhet_namn = .data[[namn_kol]])
-
-  d <- yrke_x_utb_kon |>
-    dplyr::filter(kommun_kod == geografi, .data[[filter_kol]] == filter_varde) |>
-    dplyr::transmute(enhet_kod = .data[[kod_kol]], enhet_namn = .data[[namn_kol]],
-                     kon_namn = if (kon_uppdelat) .kon_namn(kon) else "Totalt", antal) |>
+  d <- d |>
+    dplyr::mutate(kon_namn = if (kon_uppdelat) .kon_namn(kon) else "Totalt") |>
     dplyr::group_by(enhet_kod, enhet_namn, kon_namn) |>
     dplyr::summarise(antal = sum(antal), .groups = "drop")
 
@@ -225,13 +216,14 @@ antal_inom <- function(yrke_x_utb_kon, geografi, filter_kol, filter_varde, kat,
     dplyr::count(enhet_kod, enhet_namn, wt = antal, name = "total") |>
     dplyr::arrange(dplyr::desc(total))
   kanda <- total$enhet_kod[!.ar_okand(total$enhet_kod, total$enhet_namn)]
-  valda <- intersect(valda, alla_namn$enhet_kod)
+  valda <- intersect(valda, alla$enhet_kod)
   fyll  <- if (bara_valda) character(0) else
     utils::head(setdiff(kanda, valda), max(0, n - length(valda)))
   med <- c(valda, fyll)
 
   # Valda utan sysselsatta i urvalet visas som 0.
-  saknas <- alla_namn |>
+  saknas <- alla |>
+    dplyr::distinct(enhet_kod, enhet_namn) |>
     dplyr::filter(enhet_kod %in% setdiff(valda, d$enhet_kod)) |>
     dplyr::mutate(kon_namn = if (kon_uppdelat) "Kvinnor" else "Totalt", antal = 0)
 
@@ -274,12 +266,14 @@ hamta_yrke_profil <- function(ar_val, geografi, branschkoder, kat_kolumner) {
 # Bransch (grupp i vald indelning) x valda kategorikolumner för vald
 # geografi -- alla branscher, inte filtrerat på vald bransch. Samma
 # kolumner som hamta_yrke_profil(); enhet_kod = enhet_namn = gruppnamnet.
-hamta_bransch_profil <- function(ar_val, geografi, indelning_kolumn, kat_kolumner) {
+# villkor: filter enligt hamta_yrke_utb(), t.ex. ett yrke och kön.
+hamta_bransch_profil <- function(ar_val, geografi, indelning_kolumn, kat_kolumner,
+                                 villkor = list()) {
   dim_br <- hamta_dim_bransch() |>
     dplyr::select(branschkod, grupp = dplyr::all_of(indelning_kolumn)) |>
     dplyr::filter(!is.na(grupp), grupp != "")
 
-  hamta_yrke_utb(ar_val, geografi, c("branschkod", kat_kolumner)) |>
+  hamta_yrke_utb(ar_val, geografi, c("branschkod", kat_kolumner), villkor = villkor) |>
     dplyr::mutate(branschkod = sprintf("%02d", as.integer(branschkod))) |>
     dplyr::inner_join(dim_br, by = "branschkod") |>
     dplyr::group_by(enhet_kod = grupp, enhet_namn = grupp,
