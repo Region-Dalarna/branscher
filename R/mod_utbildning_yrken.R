@@ -2,7 +2,8 @@
 #  mod_utbildning_yrken.R – flik: Utbildning & yrken
 #
 #  Innehåll:
-#   - Gemensamma val (mod_urval_yrke) + utbildningsindelning
+#   - Gemensamma val (mod_urval_yrke) + utbildningsindelning, kön och
+#     ålder (Totalt eller -39 år)
 #   - Nyckeltal: sysselsatta, antal yrken, antal utbildningsgrupper,
 #     rekryteringsbredd (median antal utbildningsgrupper för 80 %)
 #   - Mosaik: vilka utbildningar har de som arbetar inom valt yrke?
@@ -13,6 +14,9 @@
 #  Data hämtas aggregerad från databasen per urval (se
 #  func_data_yrke_utb.R), och först när fliken öppnats.
 # =====================================================================
+
+UTB_YRKE_TOTALT  <- 'totalt'
+UTB_YRKE_MAX_UNG <- 39  # åldersvalet "-39 år" = åldersgrupper med övre gräns <= 39
 
 mod_utbildning_yrken_ui <- function(id) {
   ns <- NS(id)
@@ -25,14 +29,28 @@ mod_utbildning_yrken_ui <- function(id) {
             selectInput(ns('utb_indelning_val'), 'Utbildningsindelning',
                         choices = stats::setNames(UTB_INDELNINGAR$kod_kol,
                                                   UTB_INDELNINGAR$namn),
-                        selected = UTB_INDELNINGAR$kod_kol[1]))
+                        selected = UTB_INDELNINGAR$kod_kol[1])),
+        div(class = 'rd-field',
+            tags$label('Kön'),
+            shinyWidgets::radioGroupButtons(
+              ns('kon_val'), label = NULL, individual = TRUE, size = 'sm',
+              choices = c('Totalt' = UTB_YRKE_TOTALT, 'Kvinnor' = 'Kvinna', 'Män' = 'Man'),
+              selected = UTB_YRKE_TOTALT)),
+        div(class = 'rd-field',
+            tags$label('Ålder'),
+            shinyWidgets::radioGroupButtons(
+              ns('alder_val'), label = NULL, individual = TRUE, size = 'sm',
+              choices = stats::setNames(c(UTB_YRKE_TOTALT, UTB_YRKE_MAX_UNG),
+                                        c('Totalt', paste0('-', UTB_YRKE_MAX_UNG, ' år'))),
+              selected = UTB_YRKE_TOTALT))
       ),
 
       div(class = 'rd-main',
 
           div(class = 'rd-kpi-row rd-kpi-row--4',
               rd_kpi('Sysselsatta', textOutput(ns('box_sysselsatta')),
-                     'Antal sysselsatta med arbetsst\u00e4lle i vald geografi och bransch.'),
+                     paste('Antal sysselsatta med arbetsst\u00e4lle i vald geografi och bransch,',
+                           'och i valt k\u00f6n och \u00e5lder.')),
               rd_kpi('Antal yrken', textOutput(ns('box_yrken')),
                      paste('Antal yrken (SSYK 2012, tresiffrig niv\u00e5) med minst en',
                            'sysselsatt i urvalet. Ok\u00e4nt yrke r\u00e4knas inte.')),
@@ -93,12 +111,31 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
 
     # ---- Data ------------------------------------------------------------
 
+    # Kön/ålder som filter (villkor) på datafrågan; Totalt = inget filter.
+    villkor <- shiny::reactive({
+      shiny::req(input$kon_val, input$alder_val)
+      v <- list()
+      if (input$kon_val != UTB_YRKE_TOTALT) v$kon <- input$kon_val
+      if (input$alder_val != UTB_YRKE_TOTALT) {
+        v$alder <- aldersgrupper_upp_till(as.numeric(input$alder_val))
+      }
+      v
+    })
+
+    urvalstext <- shiny::reactive({
+      delar <- c(
+        if (input$kon_val == 'Kvinna') 'kvinnor' else if (input$kon_val == 'Man') 'män',
+        if (input$alder_val != UTB_YRKE_TOTALT) paste0('-', input$alder_val, ' år')
+      )
+      if (length(delar) == 0) '' else paste0(' · ', paste(delar, collapse = ', '))
+    })
+
     yrke_x_utb <- shiny::reactive({
       shiny::req(input$utb_indelning_val)
       hamta_yrke_x_utb(urval$ar(), urval$geografi(), urval$branschkoder(),
-                       input$utb_indelning_val)
+                       input$utb_indelning_val, villkor())
     }) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$branschkoder(),
-                           input$utb_indelning_val)
+                           input$utb_indelning_val, villkor())
 
     vald_x_utb <- shiny::reactive(
       dplyr::filter(yrke_x_utb(), kommun_kod == urval$geografi())
@@ -197,7 +234,7 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
       if (for_fa(d)) return(tom_mosaik())
       skapa_diagram_mosaik(
         d, geo_namn = urval$geo_namn(),
-        underrubrik = paste0(urval$underrubrik(), ' · ',
+        underrubrik = paste0(urval$underrubrik(), urvalstext(), ' · ',
                              format(sum(d$antal[d$geo_niva == 'vald']), big.mark = ' '),
                              ' sysselsatta'),
         kalla = KALLA_YRKE_UTB)

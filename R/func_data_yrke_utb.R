@@ -93,9 +93,33 @@ hamta_ar_lista_yrke_utb <- function(force = FALSE) {
   }
 }
 
+# Åldersgrupperna i tabellen (t.ex. "20-29"), yngst först. Hämtas en gång.
+hamta_aldersgrupper_yrke_utb <- function() {
+  if (is.null(.yrke_utb_cache$alder)) {
+    con <- shiny_uppkoppling_las("oppna_data")
+    on.exit(DBI::dbDisconnect(con))
+    .yrke_utb_cache$alder <- .yrke_utb_tbl(con) |>
+      dplyr::distinct(alder) |>
+      dplyr::collect() |>
+      dplyr::pull(alder) |>
+      as.character() |>
+      stats::na.omit() |>
+      sortera_aldersgrupper()
+  }
+  .yrke_utb_cache$alder
+}
+
+# Åldersgrupper vars övre gräns är högst max_alder (39 -> "-19", "20-29", "30-39").
+aldersgrupper_upp_till <- function(max_alder) {
+  grupper <- hamta_aldersgrupper_yrke_utb()
+  ovre <- .alder_granser(grupper)[, 2]
+  grupper[!is.na(ovre) & ovre <= max_alder]
+}
+
 # Grundfråga: summa sysselsatta grupperat på regionkod_ast + dims, för
 # valt år, valda geografier och (valfritt) valda branschkoder. villkor är
-# en namngiven lista med likhetsfilter, t.ex. list(ssyk3_2012 = "251").
+# en namngiven lista med filter (ett eller flera tillåtna värden per
+# kolumn), t.ex. list(kon = "Kvinna", alder = c("-19", "20-29")).
 hamta_yrke_utb <- function(ar_val, geografier, dims, branschkoder = NULL,
                            villkor = list()) {
   con <- shiny_uppkoppling_las("oppna_data")
@@ -112,7 +136,7 @@ hamta_yrke_utb <- function(ar_val, geografier, dims, branschkoder = NULL,
     q <- dplyr::filter(q, branschkod %in% !!.som_kolumntyp(con, "branschkod", branschkoder))
   }
   for (kol in names(villkor)) {
-    q <- dplyr::filter(q, !!rlang::sym(kol) == !!villkor[[kol]])
+    q <- dplyr::filter(q, !!rlang::sym(kol) %in% !!.som_kolumntyp(con, kol, villkor[[kol]]))
   }
 
   q |>
@@ -141,11 +165,11 @@ hamta_branschkoder <- function(indelning_kolumn, grupp_namn) {
 # nyckeltal och båda mosaikerna (yrke -> utbildningar och utbildning ->
 # yrken). Returnerar kolumnerna kommun_kod, yrke_kod, yrke_namn,
 # utb_kod, utb_namn, antal.
-hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol) {
+hamta_yrke_x_utb <- function(ar_val, geografi, branschkoder, utb_kol, villkor = list()) {
   namn_kol <- .utb_namn_kol(utb_kol)
   dims <- c("ssyk3_2012", "ssyk3_2012_namn", utb_kol, stats::na.omit(namn_kol))
 
-  df <- hamta_yrke_utb(ar_val, unique(c(geografi, "00")), dims, branschkoder)
+  df <- hamta_yrke_utb(ar_val, unique(c(geografi, "00")), dims, branschkoder, villkor)
 
   df |>
     dplyr::transmute(
