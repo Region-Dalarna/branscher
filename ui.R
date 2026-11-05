@@ -11,6 +11,7 @@ shinyUI(
       tags$script(src = 'popper.min.js'),
       tags$script(src = 'tippy-bundle.umd.min.js'),
       tags$script(src = 'tooltips.js'),
+      tags$script(src = www_version('sidopanel.js')),
       telemetri_ui(telemetry)
     ),
 

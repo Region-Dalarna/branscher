@@ -7,6 +7,16 @@
 
 /* Lägg appspecifika regler här. */
 
+/* Sidopanelen följer med när man scrollar (bara i tvåkolumnsläget).
+   top sätts av www/sidopanel.js när panelen är högre än fönstret. */
+@media (min-width: 901px) {
+  .rd-sidebar {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+  }
+}
+
 /* ---- Utbildning & yrken, Matchning, Demografi ---------------------------- */
 
 /* Fyra nyckeltal i rad (standard i regionprofilen är tre). */
