@@ -312,3 +312,12 @@
 .tippy-box[data-theme~='rd'][data-placement^='bottom'] > .tippy-arrow::before {
   border-bottom-color: var(--rd-text);
 }
+
+/* Branschstapeln under en mosaik: hela kortets bredd, avskild från tabellen. */
+.rd-topp--bred {
+  max-width: none;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rd-border);
+}
+.rd-topp--bred .rd-subtitle { margin-bottom: 8px; }

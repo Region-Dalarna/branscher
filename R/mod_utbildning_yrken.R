@@ -42,7 +42,19 @@ stapel_ui <- function(ns, id, placeholder, bara_etikett) {
     girafeOutput(ns(paste0(id, '_plot')), height = 'auto'))
 }
 
-STAPEL_ID <- c('stapel_bransch', 'stapel_br_yrke', 'stapel_br_utb')
+STAPEL_ID <- c('stapel_bransch_yrke', 'stapel_bransch_utb', 'stapel_br_yrke', 'stapel_br_utb')
+
+# Branscher för valt yrke / vald utbildning, längst ned i mosaikens kort.
+bransch_stapel_ui <- function(ns, id, vad) {
+  div(class = 'rd-topp rd-topp--bred',
+      h3('Inom vilka branscher arbetar de?'),
+      div(class = 'rd-subtitle',
+          paste0('Antal sysselsatta per bransch (vald branschindelning) för ', vad,
+                 ' ovan. Alla branscher räknas, även om en bransch är vald i ',
+                 'sidopanelen – den framhävs då. Branscher du lägger till framhävs och ',
+                 'ersätter de minsta.')),
+      stapel_ui(ns, id, 'Sök och lägg till branscher…', 'Visa bara valda branscher'))
+}
 
 mod_utbildning_yrken_ui <- function(id) {
   ns <- NS(id)
@@ -110,7 +122,8 @@ mod_utbildning_yrken_ui <- function(id) {
                          girafeOutput(ns('plot_yrke_utb'), height = 'auto'),
                          div(class = 'rd-topp',
                              h3('De fem vanligaste utbildningarna'),
-                             uiOutput(ns('tabell_yrke_utb')))
+                             uiOutput(ns('tabell_yrke_utb'))),
+                         bransch_stapel_ui(ns, 'stapel_bransch_yrke', 'yrket som är valt')
                      ),
 
                      div(class = 'rd-card',
@@ -125,24 +138,9 @@ mod_utbildning_yrken_ui <- function(id) {
                          girafeOutput(ns('plot_utb_yrke'), height = 'auto'),
                          div(class = 'rd-topp',
                              h3('De fem vanligaste yrkena'),
-                             uiOutput(ns('tabell_utb_yrke')))
-                     ),
-
-                     div(class = 'rd-card',
-                         h2('Inom vilka branscher arbetar de?'),
-                         div(class = 'rd-subtitle',
-                             'Antal sysselsatta per bransch (vald branschindelning) för yrket eller ',
-                             'utbildningen som är vald ovan. Alla branscher räknas, även om en bransch ',
-                             'är vald i sidopanelen – den framhävs då. Branscher du lägger till ',
-                             'framhävs och ersätter de minsta.'),
-                         div(class = 'rd-sortering',
-                             span(class = 'rd-sortering__label', 'Visa för:'),
-                             shinyWidgets::radioGroupButtons(
-                               ns('bransch_for'), label = NULL, individual = TRUE, size = 'sm',
-                               choices = c('Valt yrke' = 'yrke', 'Vald utbildning' = 'utb'),
-                               selected = 'yrke')),
-                         stapel_ui(ns, 'stapel_bransch', 'Sök och lägg till branscher…',
-                                   'Visa bara valda branscher'))
+                             uiOutput(ns('tabell_utb_yrke'))),
+                         bransch_stapel_ui(ns, 'stapel_bransch_utb', 'utbildningen som är vald')
+                     )
             ),
 
             tabPanel('Per bransch',
@@ -276,10 +274,11 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
     # Branscher att lägga till: alla grupper i vald indelning.
     branscher <- shiny::reactive(hamta_grupper_for_indelning(urval$indelning()))
     shiny::observeEvent(branscher(), {
-      updateSelectizeInput(session, 'stapel_bransch-yrken_val',
-                           choices  = branscher()$grupp_namn,
-                           selected = intersect(input[['stapel_bransch-yrken_val']],
-                                                branscher()$grupp_namn))
+      for (id in c('stapel_bransch_yrke', 'stapel_bransch_utb')) {
+        inp <- paste0(id, '-yrken_val')
+        updateSelectizeInput(session, inp, choices = branscher()$grupp_namn,
+                             selected = intersect(input[[inp]], branscher()$grupp_namn))
+      }
     })
 
     # Könsuppdelat går inte när ett kön är valt i sidopanelen.
@@ -376,41 +375,46 @@ mod_utbildning_yrken_server <- function(id, aktiv = shiny::reactive(TRUE)) {
 
     # Branscher för valt yrke / vald utbildning -- alla branscher, inte
     # filtrerat på vald bransch (egen fråga, liten: ett yrke/en utbildning).
-    bransch_for <- shiny::reactive({
-      shiny::req(input$bransch_for)
-      if (input$bransch_for == 'yrke') {
-        shiny::req(input$yrke_val)
-        l <- yrken_lista()
-        list(kol = 'ssyk3_2012', kod = input$yrke_val,
-             namn = l$yrke_namn[match(input$yrke_val, l$yrke_kod)])
-      } else {
-        shiny::req(input$utb_val, input$utb_indelning_val)
-        l <- utb_lista()
-        list(kol = input$utb_indelning_val, kod = input$utb_val,
-             namn = l$utb_namn[match(input$utb_val, l$utb_kod)])
-      }
+    # val: reaktiv -> list(kol, kod, namn). Frågan cachas, så att byte av
+    # Totalt/Könsuppdelat eller tillagda branscher inte frågar databasen igen.
+    bransch_kon <- function(val) {
+      shiny::reactive({
+        v <- val()
+        if (v$kod == 'saknas') return(NULL)
+        hamta_bransch_profil(urval$ar(), urval$geografi(), urval$indelning(), 'kon',
+                             villkor = c(villkor(), stats::setNames(list(v$kod), v$kol)))
+      }) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$indelning(), villkor(),
+                             val()$kol, val()$kod)
+    }
+    valt_yrke <- shiny::reactive({
+      shiny::req(input$yrke_val)
+      l <- yrken_lista()
+      list(kol = 'ssyk3_2012', kod = input$yrke_val,
+           namn = l$yrke_namn[match(input$yrke_val, l$yrke_kod)])
     })
-    bransch_kon <- shiny::reactive({
-      b <- bransch_for()
-      if (b$kod == 'saknas') return(NULL)
-      hamta_bransch_profil(urval$ar(), urval$geografi(), urval$indelning(), 'kon',
-                           villkor = c(villkor(), stats::setNames(list(b$kod), b$kol)))
-    }) |> shiny::bindCache(urval$ar(), urval$geografi(), urval$indelning(), villkor(),
-                           bransch_for()$kol, bransch_for()$kod)
+    vald_utb <- shiny::reactive({
+      shiny::req(input$utb_val, input$utb_indelning_val)
+      l <- utb_lista()
+      list(kol = input$utb_indelning_val, kod = input$utb_val,
+           namn = l$utb_namn[match(input$utb_val, l$utb_kod)])
+    })
+    bransch_kon_yrke <- bransch_kon(valt_yrke)
+    bransch_kon_utb  <- bransch_kon(vald_utb)
 
-    output$stapel_bransch_plot <- renderGirafe({
-      b <- bransch_for()
-      d <- bransch_kon()
+    bransch_stapel <- function(id, d, namn) {
       if (is.null(d)) {
         return(.girafe_std(.tom_plot('Branscher kan inte visas för Uppgift saknas'),
                            height_svg = 1.5))
       }
       alla <- tibble::tibble(enhet_kod = branscher()$grupp_namn, enhet_namn = branscher()$grupp_namn)
-      stapel('stapel_bransch', dplyr::select(d, enhet_kod, enhet_namn, kon, antal), alla,
-             'branscher',
-             paste0(b$namn, ' · ', urval$geo_namn(), ' · år ', urval$ar()),
+      stapel(id, dplyr::select(d, enhet_kod, enhet_namn, kon, antal), alla, 'branscher',
+             paste0(namn, ' · ', urval$geo_namn(), ' · år ', urval$ar()),
              markerad = urval$bransch())
-    })
+    }
+    output$stapel_bransch_yrke_plot <- renderGirafe(
+      bransch_stapel('stapel_bransch_yrke', bransch_kon_yrke(), valt_yrke()$namn))
+    output$stapel_bransch_utb_plot <- renderGirafe(
+      bransch_stapel('stapel_bransch_utb', bransch_kon_utb(), vald_utb()$namn))
 
     # Per bransch: största yrken / utbildningar i vald bransch.
     bransch_txt <- shiny::reactive(if (nzchar(urval$bransch())) urval$bransch() else 'alla branscher')
